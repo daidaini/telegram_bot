@@ -12,6 +12,7 @@ A Flask-based Telegram bot service that provides various information services us
    - Automatic deduplication prevents showing same articles
    - Uses feedparser library
    - Can auto-forward content to configured Telegram channel
+   - Smart forwarding: only forwards when new content is available
 3. **/news [country|topic]** - Get latest news headlines with summaries
    - Example: `/news cn` (China) or `/news us` (USA)
    - Example: `/news technology` or `/news sports` (topics)
@@ -147,6 +148,7 @@ telegram_bot/
 - **Features**: Automatic deduplication, caching, configurable limits
 - **Cache**: Tracks seen articles for 7 days to prevent duplicates
 - **Channel Forwarding**: Auto-post to Telegram channels when enabled
+- **Smart Forwarding**: Only forwards to channel when new content is available
 
 ### News API
 - **Provider**: GNews

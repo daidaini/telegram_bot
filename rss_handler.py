@@ -172,7 +172,7 @@ class RSSHandler:
     def format_for_channel(self, articles: List[Dict], channel_name: str = None) -> str:
         """Format RSS articles for Telegram channel posting"""
         if not articles:
-            return f"📡 *RSS Update*\n\n🔍 *No new articles to share*\n\nTry again later for fresh content!"
+            return ""  # Return empty string when no articles to prevent empty channel posts
 
         channel_header = f"@{channel_name}" if channel_name else "RSS News"
 

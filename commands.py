@@ -101,8 +101,11 @@ This means you've already seen all recent articles, or there are no new articles
                 user_response += f"🕐 *Updated at:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 user_response += f"\n🔄 *Articles are deduplicated across all feeds*"
 
-            # Handle channel forwarding if enabled
-            if self.config.ENABLE_RSS_FORWARDING and self.config.RSS_FORWARD_TO_CHANNEL and self.bot:
+            # Handle channel forwarding if enabled and only if there are new articles
+            if (self.config.ENABLE_RSS_FORWARDING and
+                self.config.RSS_FORWARD_TO_CHANNEL and
+                self.bot and
+                articles):  # Only forward if there are new articles
                 try:
                     channel_message = self.rss_handler.format_for_channel(
                         articles,
