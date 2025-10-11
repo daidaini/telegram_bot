@@ -36,6 +36,10 @@ class Config:
     RSS_FEEDS: list = None
     RSS_CACHE_FILE: str = 'rss_cache.json'
     MAX_ARTICLES_PER_FEED: int = 3
+
+    # Channel Forwarding Configuration
+    RSS_FORWARD_TO_CHANNEL: str = ''
+    ENABLE_RSS_FORWARDING: bool = False
     
     def __post_init__(self):
         """Validate configuration after initialization"""
@@ -56,6 +60,10 @@ class Config:
                     self.RSS_FEEDS = self._get_default_rss_feeds()
             else:
                 self.RSS_FEEDS = self._get_default_rss_feeds()
+
+        # Initialize channel forwarding settings
+        self.RSS_FORWARD_TO_CHANNEL = os.getenv('RSS_FORWARD_TO_CHANNEL', '')
+        self.ENABLE_RSS_FORWARDING = os.getenv('ENABLE_RSS_FORWARDING', 'false').lower() == 'true'
 
     def _get_default_rss_feeds(self):
         """Get default RSS feeds"""

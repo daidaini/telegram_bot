@@ -11,6 +11,7 @@ A Flask-based Telegram bot service that provides various information services us
    - Fetches from multiple configurable RSS sources
    - Automatic deduplication prevents showing same articles
    - Uses feedparser library
+   - Can auto-forward content to configured Telegram channel
 3. **/news [country|topic]** - Get latest news headlines with summaries
    - Example: `/news cn` (China) or `/news us` (USA)
    - Example: `/news technology` or `/news sports` (topics)
@@ -70,6 +71,17 @@ The bot comes with default RSS feeds (BBC, Reuters, CNN), but you can configure 
    ```
 3. Set maximum articles per feed: `MAX_ARTICLES_PER_FEED=3`
 
+#### RSS Channel Forwarding (Optional)
+Automatically forward RSS news to a Telegram channel when `/rss_news` is called:
+
+1. Add bot as administrator to your target channel
+2. Edit your `.env` file:
+   ```
+   RSS_FORWARD_TO_CHANNEL=cangshuing
+   ENABLE_RSS_FORWARDING=true
+   ```
+3. Bot will automatically post formatted RSS content to the channel
+
 #### News API Key (Optional)
 1. Sign up at [GNews](https://gnews.io/)
 2. Get your free API key
@@ -87,6 +99,9 @@ python test_news.py
 
 # Test RSS feeds functionality
 python test_rss.py
+
+# Test channel forwarding
+python test_channel_forwarding.py
 ```
 
 These scripts test various commands without requiring Telegram integration.
@@ -118,6 +133,7 @@ telegram_bot/
 ├── rss_handler.py      # RSS feed fetching and deduplication logic
 ├── test_news.py        # Test script for GNews functionality
 ├── test_rss.py         # Test script for RSS functionality
+├── test_channel_forwarding.py  # Test script for channel forwarding
 ├── requirements.txt    # Python dependencies
 ├── .env.example        # Environment variables template
 └── README.md          # This documentation
@@ -130,6 +146,7 @@ telegram_bot/
 - **Sources**: Configurable RSS feeds (default: BBC, Reuters, CNN)
 - **Features**: Automatic deduplication, caching, configurable limits
 - **Cache**: Tracks seen articles for 7 days to prevent duplicates
+- **Channel Forwarding**: Auto-post to Telegram channels when enabled
 
 ### News API
 - **Provider**: GNews
@@ -154,6 +171,8 @@ telegram_bot/
 | `GNEWS_API_KEY` | Optional | - | GNews API key |
 | `RSS_FEEDS` | Optional | Default feeds | JSON array of RSS feed configurations |
 | `MAX_ARTICLES_PER_FEED` | No | 3 | Maximum articles to fetch per RSS feed |
+| `RSS_FORWARD_TO_CHANNEL` | Optional | - | Channel username for auto-forwarding |
+| `ENABLE_RSS_FORWARDING` | No | false | Enable/disable channel forwarding |
 | `DEFAULT_NEWS_COUNTRY` | No | cn | Default country for news queries |
 | `DEFAULT_NEWS_LANGUAGE` | No | zh | Default language for news (zh=Chinese) |
 
@@ -220,12 +239,17 @@ CMD ["python", "app.py"]
    - Verify RSS feed format is valid
    - Ensure network connectivity to feed sources
 
-3. **News API Errors**
+3. **Channel Forwarding Errors**
+   - Ensure bot is added as administrator to target channel
+   - Verify channel username is correct (without @ symbol)
+   - Check bot has posting permissions in channel
+
+4. **News API Errors**
    - Verify GNews API key validity
    - Check country code format (2-letter codes) or topic keywords
    - Ensure API quota available
 
-4. **Connection Issues**
+5. **Connection Issues**
    - Check internet connectivity
    - Verify firewall settings
    - Ensure ports are open

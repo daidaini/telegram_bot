@@ -7,9 +7,10 @@ from rss_handler import RSSHandler
 logger = logging.getLogger(__name__)
 
 class CommandHandler:
-    def __init__(self):
+    def __init__(self, bot_instance=None):
         self.config = Config()
         self.rss_handler = RSSHandler(self.config)
+        self.bot = bot_instance  # Reference to bot instance for channel posting
         self.commands = {
             '/list': self.list_commands,
             '/help': self.list_commands,
@@ -30,6 +31,7 @@ class CommandHandler:
 📡 *RSS News Feeds:*
 • `/rss_news` - Get latest news from RSS feeds
   Fetches from multiple configurable RSS sources
+  (Can auto-forward to configured channel)
 
 📰 *News Headlines:*
 • `/news [country]` - Get latest news headlines with summaries
@@ -49,15 +51,16 @@ class CommandHandler:
         return help_text.strip()
     
     def get_rss_news(self, command, full_message, user_id):
-        """Get latest news from RSS feeds"""
+        """Get latest news from RSS feeds with optional channel forwarding"""
         try:
             logger.info(f"Fetching RSS news for user {user_id}")
 
             # Get latest articles from RSS feeds
             articles = self.rss_handler.get_latest_news(max_total=10)
 
+            # Format user response
             if not articles:
-                return """
+                user_response = """
 📡 *RSS News Update*
 
 🔍 *No new articles found*
@@ -72,33 +75,58 @@ This means you've already seen all recent articles, or there are no new articles
                     len(self.config.RSS_FEEDS),
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 ).strip()
+            else:
+                # Format RSS news response for user
+                user_response = f"📡 *Latest RSS News*\n\n"
+                user_response += f"📊 *Found {len(articles)} new articles*\n\n"
 
-            # Format RSS news response
-            rss_text = f"📡 *Latest RSS News*\n\n"
-            rss_text += f"📊 *Found {len(articles)} new articles*\n\n"
+                for i, article in enumerate(articles, 1):
+                    title = article.get('title', 'No title')
+                    summary = article.get('summary', '')
+                    source = article.get('source', 'Unknown')
+                    link = article.get('link', '')
+                    category = article.get('category', 'general')
+                    published = article.get('published', '')
 
-            for i, article in enumerate(articles, 1):
-                title = article.get('title', 'No title')
-                summary = article.get('summary', '')
-                source = article.get('source', 'Unknown')
-                link = article.get('link', '')
-                category = article.get('category', 'general')
-                published = article.get('published', '')
+                    user_response += f"{i}. **{title}**\n"
+                    if summary:
+                        user_response += f"   📝 *{summary}*\n"
+                    user_response += f"   📺 *Source: {source} ({category})*\n"
+                    if link:
+                        user_response += f"   🔗 [Read full article]({link})\n"
+                    if published:
+                        user_response += f"   📅 *{published}*\n"
+                    user_response += "\n"
 
-                rss_text += f"{i}. **{title}**\n"
-                if summary:
-                    rss_text += f"   📝 *{summary}*\n"
-                rss_text += f"   📺 *Source: {source} ({category})*\n"
-                if link:
-                    rss_text += f"   🔗 [Read full article]({link})\n"
-                if published:
-                    rss_text += f"   📅 *{published}*\n"
-                rss_text += "\n"
+                user_response += f"🕐 *Updated at:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                user_response += f"\n🔄 *Articles are deduplicated across all feeds*"
 
-            rss_text += f"🕐 *Updated at:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            rss_text += f"\n🔄 *Articles are deduplicated across all feeds*"
+            # Handle channel forwarding if enabled
+            if self.config.ENABLE_RSS_FORWARDING and self.config.RSS_FORWARD_TO_CHANNEL and self.bot:
+                try:
+                    channel_message = self.rss_handler.format_for_channel(
+                        articles,
+                        self.config.RSS_FORWARD_TO_CHANNEL
+                    )
 
-            return rss_text.strip()
+                    logger.info(f"Forwarding RSS news to channel: @{self.config.RSS_FORWARD_TO_CHANNEL}")
+                    forward_result = self.bot.send_message_to_channel(
+                        self.config.RSS_FORWARD_TO_CHANNEL,
+                        channel_message
+                    )
+
+                    if forward_result:
+                        logger.info(f"Successfully forwarded RSS news to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
+                        user_response += f"\n\n✅ *Content also forwarded to @{self.config.RSS_FORWARD_TO_CHANNEL}*"
+                    else:
+                        logger.warning(f"Failed to forward RSS news to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
+                        user_response += f"\n\n⚠️ *Channel forwarding failed*"
+
+                except Exception as e:
+                    logger.error(f"Error forwarding RSS news to channel: {e}")
+                    user_response += f"\n\n⚠️ *Channel forwarding error:* {str(e)}"
+
+            return user_response.strip()
 
         except Exception as e:
             logger.error(f"Unexpected error in RSS news command: {e}")

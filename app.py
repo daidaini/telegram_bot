@@ -21,7 +21,7 @@ class TelegramBot:
     def __init__(self):
         self.app = Flask(__name__)
         self.config = Config()
-        self.command_handler = CommandHandler()
+        self.command_handler = CommandHandler(bot_instance=self)
         self.bot_token = self.config.BOT_TOKEN
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
         self.offset = 0
@@ -45,7 +45,7 @@ class TelegramBot:
             'text': text,
             'parse_mode': parse_mode
         }
-        
+
         try:
             response = requests.post(url, data=data, timeout=10)
             response.raise_for_status()
@@ -53,6 +53,28 @@ class TelegramBot:
             return response.json()
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to send message: {e}")
+            return None
+
+    def send_message_to_channel(self, channel_username, text, parse_mode='Markdown'):
+        """Send message to Telegram channel"""
+        # Remove @ if present and format correctly
+        channel_name = channel_username.lstrip('@')
+        chat_id = f"@{channel_name}"
+
+        url = f"{self.api_url}/sendMessage"
+        data = {
+            'chat_id': chat_id,
+            'text': text,
+            'parse_mode': parse_mode
+        }
+
+        try:
+            response = requests.post(url, data=data, timeout=10)
+            response.raise_for_status()
+            logger.info(f"Message sent to channel {chat_id}")
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to send message to channel {chat_id}: {e}")
             return None
     
     def get_updates(self):

@@ -169,6 +169,37 @@ class RSSHandler:
         logger.info(f"Total new articles: {len(all_articles)}")
         return all_articles
 
+    def format_for_channel(self, articles: List[Dict], channel_name: str = None) -> str:
+        """Format RSS articles for Telegram channel posting"""
+        if not articles:
+            return f"📡 *RSS Update*\n\n🔍 *No new articles to share*\n\nTry again later for fresh content!"
+
+        channel_header = f"@{channel_name}" if channel_name else "RSS News"
+
+        # Format channel message
+        channel_text = f"📡 *{channel_header} RSS Update*\n\n"
+        channel_text += f"📊 *{len(articles)} New Articles*\n\n"
+
+        for i, article in enumerate(articles, 1):
+            title = article.get('title', 'No title')
+            summary = article.get('summary', '')
+            source = article.get('source', 'Unknown')
+            category = article.get('category', 'general')
+            link = article.get('link', '')
+
+            channel_text += f"🔹 **{title}**\n"
+            if summary:
+                channel_text += f"📝 {summary}\n"
+            channel_text += f"📺 Source: {source} ({category})\n"
+            if link:
+                channel_text += f"🔗 [Read more]({link})\n"
+            channel_text += "\n"
+
+        channel_text += f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        channel_text += f"🔄 *Auto-posted via RSS Bot*"
+
+        return channel_text
+
     def get_latest_news(self, max_total: int = 10) -> List[Dict]:
         """Get latest news from all RSS feeds"""
         try:
