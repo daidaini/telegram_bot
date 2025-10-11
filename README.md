@@ -8,9 +8,11 @@ A Flask-based Telegram bot service that provides various information services us
 
 1. **/list** - Display all available commands and their descriptions
 2. **/rss_news** - Get latest news from RSS feeds
-   - Fetches from multiple configurable RSS sources
+   - Fetches from multiple configurable RSS sources using round-robin logic
+   - **Today-only content**: Only retrieves articles published today
+   - **One article per feed**: Maximum one article per RSS source per request
    - Automatic deduplication prevents showing same articles
-   - Uses feedparser library
+   - Uses feedparser library with enhanced date parsing
    - Can auto-forward content to configured Telegram channel
    - Smart forwarding: only forwards when new content is available
 3. **/news [country|topic]** - Get latest news headlines with summaries
@@ -103,6 +105,15 @@ python test_rss.py
 
 # Test channel forwarding
 python test_channel_forwarding.py
+
+# Test round-robin RSS logic
+python test_round_robin_logic.py
+
+# Test RSS feeds with new logic
+python test_round_robin_rss.py
+
+# System status check
+python system_status.py
 ```
 
 These scripts test various commands without requiring Telegram integration.
@@ -135,6 +146,9 @@ telegram_bot/
 ├── test_news.py        # Test script for GNews functionality
 ├── test_rss.py         # Test script for RSS functionality
 ├── test_channel_forwarding.py  # Test script for channel forwarding
+├── test_round_robin_logic.py   # Test script for round-robin RSS logic
+├── test_round_robin_rss.py     # Test script for RSS feeds with new logic
+├── system_status.py    # System status check script
 ├── requirements.txt    # Python dependencies
 ├── .env.example        # Environment variables template
 └── README.md          # This documentation
@@ -143,12 +157,15 @@ telegram_bot/
 ## API Integration Details
 
 ### RSS Feeds
-- **Library**: feedparser
+- **Library**: feedparser with python-dateutil for enhanced date parsing
 - **Sources**: Configurable RSS feeds (default: BBC, Reuters, CNN)
-- **Features**: Automatic deduplication, caching, configurable limits
-- **Cache**: Tracks seen articles for 7 days to prevent duplicates
-- **Channel Forwarding**: Auto-post to Telegram channels when enabled
-- **Smart Forwarding**: Only forwards to channel when new content is available
+- **Features**:
+  - **Round-robin fetching**: One article per feed per request
+  - **Today-only filtering**: Only articles published today
+  - **Automatic deduplication**: Prevents showing same articles
+  - **Smart caching**: Enhanced cache with metadata (7-day retention)
+  - **Channel Forwarding**: Auto-post to Telegram channels when enabled
+  - **Smart Forwarding**: Only forwards to channel when new content is available
 
 ### News API
 - **Provider**: GNews

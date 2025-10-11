@@ -56,3 +56,9 @@ htmlcov/
 # dir
 .claude/
 Test/
+
+
+#cache
+rss_cache.json
+
+test_*

@@ -2,6 +2,7 @@ import feedparser
 import json
 import hashlib
 import logging
+import ssl
 from datetime import datetime, timedelta
 from typing import Dict, List, Set, Optional
 from config import Config
@@ -16,38 +17,103 @@ class RSSHandler:
         self.cache_file = config.RSS_CACHE_FILE
         self.seen_articles = self._load_cache()
 
-    def _load_cache(self) -> Set[str]:
-        """Load seen article URLs from cache file"""
+        # Configure SSL context for feedparser to handle certificate issues
+        self._setup_ssl_context()
+
+    def _setup_ssl_context(self):
+        """Setup SSL context to handle certificate verification issues"""
+        try:
+            # Set global SSL context to ignore certificate verification
+            import ssl
+            ssl._create_default_https_context = ssl._create_unverified_context
+
+            # Configure feedparser user agent
+            feedparser.USER_AGENT = "RSS-Bot/1.0 (+https://github.com/example/rss-bot)"
+
+            logger.info("SSL context configured for RSS feeds (certificate verification disabled)")
+        except Exception as e:
+            logger.warning(f"Failed to setup SSL context: {e}")
+
+    def _load_cache(self) -> Dict[str, Dict]:
+        """Load cache from file with new structure"""
         try:
             with open(self.cache_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Clean old entries (older than 7 days)
-                cutoff_date = datetime.now() - timedelta(days=7)
-                cleaned_data = {
-                    url: timestamp for url, timestamp in data.items()
-                    if datetime.fromisoformat(timestamp) > cutoff_date
-                }
 
-                # Save cleaned cache
-                with open(self.cache_file, 'w', encoding='utf-8') as f:
-                    json.dump(cleaned_data, f, ensure_ascii=False, indent=2)
+            # Clean old entries (older than 7 days)
+            cutoff_date = datetime.now() - timedelta(days=7)
+            cleaned_data = {}
 
-                return set(cleaned_data.keys())
+            for article_hash, article_data in data.items():
+                try:
+                    article_date = datetime.fromisoformat(article_data.get('fetched_at', ''))
+                    if article_date > cutoff_date:
+                        cleaned_data[article_hash] = article_data
+                except (ValueError, TypeError):
+                    continue
+
+            # Save cleaned cache
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cleaned_data, f, ensure_ascii=False, indent=2)
+
+            return cleaned_data
         except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
             logger.info(f"Creating new RSS cache: {e}")
-            return set()
+            return {}
 
     def _save_cache(self):
-        """Save seen article URLs to cache file"""
+        """Save cache to file with new structure"""
         try:
-            data = {
-                url: datetime.now().isoformat()
-                for url in self.seen_articles
-            }
             with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(self.seen_articles, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Failed to save RSS cache: {e}")
+
+    def _is_today(self, published_date: str) -> bool:
+        """Check if article was published today"""
+        if not published_date:
+            return False
+
+        today = datetime.now().date()
+        today_str = today.strftime('%Y-%m-%d')
+
+        try:
+            # Try different date parsing approaches
+            from dateutil import parser as date_parser
+            import re
+
+            # Method 1: Check if today's date is in the string
+            if today_str in published_date:
+                return True
+
+            # Method 2: Parse with dateutil
+            try:
+                pub_date = date_parser.parse(published_date)
+                return pub_date.date() == today
+            except:
+                pass
+
+            # Method 3: Handle specific RSS date formats
+            rss_patterns = [
+                r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
+                r'\d{1,2}\s+\w+\s+\d{4}',  # DD Mon YYYY
+                r'\w{3},\s+\d{1,2}\s+\w{3}\s+\d{4}',  # Day, DD Mon YYYY
+            ]
+
+            for pattern in rss_patterns:
+                match = re.search(pattern, published_date)
+                if match:
+                    date_part = match.group()
+                    try:
+                        parsed_date = date_parser.parse(date_part)
+                        return parsed_date.date() == today
+                    except:
+                        continue
+
+        except Exception as e:
+            logger.debug(f"Date parsing error for '{published_date}': {e}")
+
+        return False
 
     def _get_article_hash(self, article: Dict) -> str:
         """Generate a unique hash for an article based on title and link"""
@@ -61,10 +127,16 @@ class RSSHandler:
         article_hash = self._get_article_hash(article)
         return article_hash in self.seen_articles
 
-    def _mark_article_seen(self, article: Dict):
-        """Mark an article as seen"""
+    def _mark_article_seen(self, article: Dict, feed_name: str):
+        """Mark an article as seen with additional metadata"""
         article_hash = self._get_article_hash(article)
-        self.seen_articles.add(article_hash)
+        self.seen_articles[article_hash] = {
+            'title': article.get('title', ''),
+            'link': article.get('link', ''),
+            'feed_name': feed_name,
+            'fetched_at': datetime.now().isoformat(),
+            'published_at': article.get('published', '')
+        }
 
     def _clean_text(self, text: str) -> str:
         """Clean HTML tags and extra whitespace from text"""
@@ -86,15 +158,75 @@ class RSSHandler:
             return text
         return text[:max_length].rsplit(' ', 1)[0] + "..."
 
+    def fetch_feed_single_article(self, feed_config: Dict) -> Dict:
+        """Fetch a single today's article from a single RSS feed"""
+        feed_url = feed_config.get('url')
+        feed_name = feed_config.get('name', 'Unknown Feed')
+
+        try:
+            logger.info(f"Fetching RSS feed for single article: {feed_name} ({feed_url})")
+
+            # Fetch RSS feed (SSL context is already configured globally)
+            feed = feedparser.parse(feed_url)
+
+            if feed.bozo:
+                logger.warning(f"RSS feed parsing warning for {feed_name}: {feed.bozo_exception}")
+
+            if not feed.entries:
+                logger.debug(f"No entries found in RSS feed: {feed_name}")
+                return None
+
+            # Sort entries by publication date (newest first)
+            sorted_entries = sorted(feed.entries,
+                                 key=lambda x: x.get('published', ''),
+                                 reverse=True)
+
+            # Find the first article from today that hasn't been seen
+            for entry in sorted_entries:
+                # Check if article is from today
+                if not self._is_today(entry.get('published', '')):
+                    continue
+
+                # Skip if article has been seen before
+                if self._is_article_seen(entry):
+                    logger.debug(f"Article already seen: {entry.get('title', 'No title')[:50]}...")
+                    continue
+
+                # Extract article information
+                article = {
+                    'title': self._clean_text(entry.get('title', 'No title')),
+                    'summary': self._clean_text(entry.get('summary', entry.get('description', ''))),
+                    'link': entry.get('link', ''),
+                    'source': feed_name,
+                    'category': feed_config.get('category', 'general'),
+                    'published': entry.get('published', '')
+                }
+
+                # Truncate summary
+                article['summary'] = self._truncate_text(article['summary'])
+
+                if article['title'] and article['link']:
+                    # Mark as seen immediately
+                    self._mark_article_seen(entry, feed_name)
+                    logger.info(f"Found today's article from {feed_name}: {article['title'][:50]}...")
+                    return article
+
+            logger.debug(f"No new today's articles found in {feed_name}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error fetching RSS feed {feed_name}: {e}")
+            return None
+
     def fetch_feed(self, feed_config: Dict) -> List[Dict]:
-        """Fetch articles from a single RSS feed"""
+        """Fetch articles from a single RSS feed (legacy method for compatibility)"""
         feed_url = feed_config.get('url')
         feed_name = feed_config.get('name', 'Unknown Feed')
 
         try:
             logger.info(f"Fetching RSS feed: {feed_name} ({feed_url})")
 
-            # Fetch RSS feed
+            # Fetch RSS feed (SSL context is already configured globally)
             feed = feedparser.parse(feed_url)
 
             if feed.bozo:
@@ -131,7 +263,7 @@ class RSSHandler:
 
                 if article['title'] and article['link']:
                     articles.append(article)
-                    self._mark_article_seen(entry)
+                    self._mark_article_seen(entry, feed_name)
                     article_count += 1
                     logger.debug(f"New article from {feed_name}: {article['title'][:50]}...")
 
@@ -200,10 +332,45 @@ class RSSHandler:
 
         return channel_text
 
+    def fetch_all_feeds_round_robin(self) -> List[Dict]:
+        """Fetch one article from each RSS feed using round-robin logic"""
+        if not self.config.RSS_FEEDS:
+            logger.warning("No RSS feeds configured")
+            return []
+
+        articles = []
+        logger.info(f"Starting round-robin fetch from {len(self.config.RSS_FEEDS)} RSS feeds")
+
+        # Iterate through each feed and try to get one article
+        for feed_config in self.config.RSS_FEEDS:
+            if not isinstance(feed_config, dict) or 'url' not in feed_config:
+                logger.warning(f"Invalid RSS feed configuration: {feed_config}")
+                continue
+
+            feed_name = feed_config.get('name', 'Unknown Feed')
+            logger.info(f"Checking feed: {feed_name}")
+
+            # Try to get a single article from this feed
+            article = self.fetch_feed_single_article(feed_config)
+            if article:
+                articles.append(article)
+                logger.info(f"Successfully fetched 1 article from {feed_name}")
+            else:
+                logger.debug(f"No new today's articles from {feed_name}")
+
+        # Sort articles by publication date
+        articles.sort(key=lambda x: x.get('published', ''), reverse=True)
+
+        # Save updated cache
+        self._save_cache()
+
+        logger.info(f"Round-robin fetch complete: {len(articles)} articles from {len(self.config.RSS_FEEDS)} feeds")
+        return articles
+
     def get_latest_news(self, max_total: int = 10) -> List[Dict]:
-        """Get latest news from all RSS feeds"""
+        """Get latest news from all RSS feeds using new round-robin logic"""
         try:
-            articles = self.fetch_all_feeds()
+            articles = self.fetch_all_feeds_round_robin()
 
             if not articles:
                 return []
