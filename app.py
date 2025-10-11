@@ -1,9 +1,11 @@
-from flask import Flask
+from flask import Flask, request, abort
 import threading
 import time
 import requests
 import json
 import os
+import hashlib
+import hmac
 from datetime import datetime
 import logging
 
@@ -27,9 +29,11 @@ class TelegramBot:
         self.offset = 0
         self.running = False
         
-        # Register Flask routes (for health check)
+        # Register Flask routes
         self.app.route('/')(self.index)
         self.app.route('/health')(self.health_check)
+        self.app.route('/webhook', methods=['POST'])(self.webhook)
+        self.app.route('/setup_webhook')(self.setup_webhook_page)
     
     def index(self):
         return "Telegram Bot is running!"
@@ -146,20 +150,208 @@ class TelegramBot:
         """Stop the polling loop"""
         self.running = False
         logger.info("Bot polling stopped.")
-    
+
+    def verify_webhook_signature(self, payload, signature):
+        """Verify webhook signature if secret token is set"""
+        if not self.config.WEBHOOK_SECRET_TOKEN:
+            return True  # Skip verification if no secret token
+
+        try:
+            # Calculate expected signature
+            expected_signature = hmac.new(
+                self.config.WEBHOOK_SECRET_TOKEN.encode('utf-8'),
+                payload,
+                hashlib.sha256
+            ).hexdigest()
+
+            # Compare signatures (remove 'sha256=' prefix if present)
+            if signature.startswith('sha256='):
+                signature = signature[7:]
+
+            return hmac.compare_digest(expected_signature, signature)
+        except Exception as e:
+            logger.error(f"Webhook signature verification error: {e}")
+            return False
+
+    def webhook(self):
+        """Handle incoming webhook updates from Telegram"""
+        # Get request data
+        payload = request.get_data(as_text=True)
+        signature = request.headers.get('X-Telegram-Bot-Api-Secret-Token', '')
+
+        # Verify webhook signature
+        if not self.verify_webhook_signature(payload, signature):
+            logger.warning("Invalid webhook signature")
+            abort(403)
+
+        try:
+            # Parse JSON data
+            update = request.get_json()
+
+            if not update:
+                logger.warning("Empty webhook payload")
+                return "ok"
+
+            logger.info(f"Received webhook update: {update}")
+
+            # Handle message update
+            if 'message' in update:
+                self.handle_message(update['message'])
+            elif 'channel_post' in update:
+                # Handle channel posts if needed
+                logger.info("Received channel post via webhook")
+
+            return "ok"  # Telegram expects "ok" response
+
+        except Exception as e:
+            logger.error(f"Error processing webhook: {e}")
+            return "ok"  # Still return "ok" to avoid Telegram retrying
+
+    def setup_webhook_page(self):
+        """Webhook setup page"""
+        mode = self.config.BOT_MODE
+        webhook_url = self.config.WEBHOOK_URL
+
+        if mode == 'webhook':
+            return f"""
+🤖 Telegram Bot Webhook Status
+==================================
+
+✅ **Bot Mode**: {mode.upper()}
+📡 **Webhook URL**: {webhook_url or 'Not configured'}
+🔐 **Secret Token**: {'Configured' if self.config.WEBHOOK_SECRET_TOKEN else 'Not configured'}
+
+📋 **Current Configuration**:
+• Bot Token: {'✅ Configured' if self.config.BOT_TOKEN else '❌ Missing'}
+• RSS Feeds: {len(self.config.RSS_FEEDS)} configured
+• Channel Forwarding: {self.config.RSS_FORWARD_TO_CHANNEL or 'Disabled'}
+
+📡 **Webhook Setup Commands**:
+```bash
+# Set webhook
+curl -X POST "https://api.telegram.org/bot{self.config.BOT_TOKEN}/setWebhook" \\
+     -H "Content-Type: application/json" \\
+     -d '{{"url": "{webhook_url or "YOUR_WEBHOOK_URL"}", "secret_token": "your_secret_token"}}'
+
+# Get webhook info
+curl -X GET "https://api.telegram.org/bot{self.config.BOT_TOKEN}/getWebhookInfo"
+
+# Delete webhook (switch back to polling)
+curl -X POST "https://api.telegram.org/bot{self.config.BOT_TOKEN}/deleteWebhook"
+```
+
+⚠️ **Important Notes**:
+• Your webhook URL must be publicly accessible
+• Use HTTPS for webhook URL
+• Configure firewall to allow Telegram servers
+• Make sure your web server is running on the specified port
+
+🔄 **To switch to polling mode**, set BOT_MODE=polling in your .env file
+        """
+        else:
+            return f"""
+🤖 Telegram Bot Status
+==================================
+
+📡 **Bot Mode**: {mode.upper()} (Polling)
+🔄 **Webhook Mode**: Not enabled
+
+📋 **Current Configuration**:
+• Bot Token: {'✅ Configured' if self.config.BOT_TOKEN else '❌ Missing'}
+• RSS Feeds: {len(self.config.RSS_FEEDS)} configured
+• Channel Forwarding: {self.config.RSS_FORWARD_TO_CHANNEL or 'Disabled'}
+
+🔄 **To switch to webhook mode**, update your .env file:
+```bash
+BOT_MODE=webhook
+WEBHOOK_URL=https://yourdomain.com/webhook
+WEBHOOK_SECRET_TOKEN=your_secret_token
+WEBHOOK_PORT=8443  # Your desired port
+```
+
+✅ **Bot is running in polling mode**
+        """
+
+    def setup_webhook(self):
+        """Setup webhook with Telegram API"""
+        if not self.config.WEBHOOK_URL:
+            logger.error("WEBHOOK_URL not configured")
+            return False
+
+        try:
+            url = f"{self.api_url}/setWebhook"
+            data = {
+                'url': self.config.WEBHOOK_URL,
+                'secret_token': self.config.WEBHOOK_SECRET_TOKEN
+            }
+
+            response = requests.post(url, json=data, timeout=10)
+            response.raise_for_status()
+
+            result = response.json()
+            if result.get('ok'):
+                logger.info(f"Webhook set successfully: {self.config.WEBHOOK_URL}")
+                return True
+            else:
+                logger.error(f"Failed to set webhook: {result.get('description', 'Unknown error')}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error setting webhook: {e}")
+            return False
+
+    def delete_webhook(self):
+        """Delete webhook (switch back to polling)"""
+        try:
+            url = f"{self.api_url}/deleteWebhook"
+            response = requests.post(url, timeout=10)
+            response.raise_for_status()
+
+            result = response.json()
+            if result.get('ok'):
+                logger.info("Webhook deleted successfully")
+                return True
+            else:
+                logger.error(f"Failed to delete webhook: {result.get('description', 'Unknown error')}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error deleting webhook: {e}")
+            return False
+
     def run(self):
-        """Run the Flask app and start bot polling in background"""
+        """Run the Flask app with appropriate mode"""
         if not self.bot_token:
             logger.error("BOT_TOKEN not configured!")
             return
-        
-        # Start polling in background thread
-        polling_thread = threading.Thread(target=self.start_polling, daemon=True)
-        polling_thread.start()
-        
-        # Run Flask app
-        logger.info("Starting Flask web server...")
-        self.app.run(host='0.0.0.0', port=5000, debug=False)
+
+        mode = self.config.BOT_MODE
+        logger.info(f"Starting Telegram bot in {mode} mode")
+
+        if mode == 'webhook':
+            # Webhook mode: setup webhook and run Flask app
+            logger.info(f"Webhook URL: {self.config.WEBHOOK_URL}")
+
+            # Setup webhook
+            if self.config.WEBHOOK_URL:
+                self.setup_webhook()
+
+            # Run Flask app
+            logger.info(f"Starting Flask web server on port {self.config.WEBHOOK_PORT}...")
+            self.app.run(
+                host='0.0.0.0',
+                port=self.config.WEBHOOK_PORT,
+                debug=False
+            )
+        else:
+            # Polling mode: start polling in background thread
+            logger.info("Starting long polling...")
+            polling_thread = threading.Thread(target=self.start_polling, daemon=True)
+            polling_thread.start()
+
+            # Run Flask app (for health checks and webhook setup page)
+            logger.info("Starting Flask web server...")
+            self.app.run(host='0.0.0.0', port=5000, debug=False)
 
 if __name__ == '__main__':
     bot = TelegramBot()

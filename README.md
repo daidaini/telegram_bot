@@ -1,6 +1,6 @@
 # Telegram Bot Service
 
-A Flask-based Telegram bot service that provides various information services using long polling mode.
+A Flask-based Telegram bot service that provides various information services using both long polling and webhook modes.
 
 ## Features
 
@@ -25,10 +25,11 @@ A Flask-based Telegram bot service that provides various information services us
 ## Architecture
 
 - **Framework**: Flask 2.3.3
-- **Communication**: Telegram Bot API with long polling
+- **Communication**: Telegram Bot API (supports both polling and webhook modes)
 - **External APIs**: GNews, Quotable
 - **RSS Feeds**: Configurable RSS sources with deduplication
 - **Configuration**: Environment variables with .env file support
+- **Deployment**: Flexible deployment options (local server, Docker, cloud services)
 
 ## Installation
 
@@ -64,6 +65,28 @@ nano .env
 2. Get your bot token
 3. Add to `.env`: `TELEGRAM_BOT_TOKEN=your_bot_token_here`
 
+### 3. Choose Bot Mode
+
+#### Option 1: Long Polling Mode (Default)
+- Bot actively polls Telegram API for updates
+- No additional setup required
+- Works behind NAT/firewalls
+- Limited to one bot instance
+
+#### Option 2: Webhook Mode
+- Telegram sends updates to your server
+- Faster response times
+- Supports multiple bot instances
+- Requires publicly accessible HTTPS URL
+
+To use webhook mode, add to `.env`:
+```bash
+BOT_MODE=webhook
+WEBHOOK_URL=https://yourdomain.com/webhook
+WEBHOOK_SECRET_TOKEN=your_secret_token
+WEBHOOK_PORT=8443
+```
+
 #### RSS Feed Configuration (Optional)
 The bot comes with default RSS feeds (BBC, Reuters, CNN), but you can configure custom feeds:
 
@@ -84,6 +107,34 @@ Automatically forward RSS news to a Telegram channel when `/rss_news` is called:
    ENABLE_RSS_FORWARDING=true
    ```
 3. Bot will automatically post formatted RSS content to the channel
+
+### 4. Webhook Setup (Optional)
+
+If using webhook mode, you'll need to set up your webhook:
+
+#### Method 1: Automated Setup Script
+```bash
+# Test webhook endpoint and set it up
+python setup_webhook.py --action set --url https://yourdomain.com/webhook --secret your_secret_token
+```
+
+#### Method 2: Manual Setup
+```bash
+# Set webhook
+curl -X POST "https://api.telegram.org/botYOUR_TOKEN/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://yourdomain.com/webhook", "secret_token": "your_secret_token"}'
+
+# Verify webhook
+curl -X GET "https://api.telegram.org/botYOUR_TOKEN/getWebhookInfo"
+```
+
+#### Webhook Requirements:
+- **HTTPS URL**: Must use HTTPS (required by Telegram)
+- **Public Access**: URL must be accessible from the internet
+- **SSL Certificate**: Valid SSL certificate (self-signed may work)
+- **Firewall**: Port must be open (443 for HTTPS, or your custom port)
+- **Response Time**: Must respond within 30 seconds
 
 #### News API Key (Optional)
 1. Sign up at [GNews](https://gnews.io/)
@@ -114,6 +165,9 @@ python test_round_robin_rss.py
 
 # System status check
 python system_status.py
+
+# Webhook management
+python setup_webhook.py --action info
 ```
 
 These scripts test various commands without requiring Telegram integration.

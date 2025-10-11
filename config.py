@@ -1,7 +1,10 @@
 import os
 import json
+import logging
 from dataclasses import dataclass
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -40,6 +43,12 @@ class Config:
     # Channel Forwarding Configuration
     RSS_FORWARD_TO_CHANNEL: str = ''
     ENABLE_RSS_FORWARDING: bool = False
+
+    # Webhook Configuration
+    BOT_MODE: str = 'polling'  # 'polling' or 'webhook'
+    WEBHOOK_URL: str = ''  # Your webhook URL (e.g., https://yourdomain.com/webhook)
+    WEBHOOK_SECRET_TOKEN: str = ''  # Optional secret token for webhook security
+    WEBHOOK_PORT: int = 5000  # Port for webhook mode
     
     def __post_init__(self):
         """Validate configuration after initialization"""
@@ -64,6 +73,17 @@ class Config:
         # Initialize channel forwarding settings
         self.RSS_FORWARD_TO_CHANNEL = os.getenv('RSS_FORWARD_TO_CHANNEL', '')
         self.ENABLE_RSS_FORWARDING = os.getenv('ENABLE_RSS_FORWARDING', 'false').lower() == 'true'
+
+        # Initialize webhook settings
+        self.BOT_MODE = os.getenv('BOT_MODE', 'polling')
+        self.WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
+        self.WEBHOOK_SECRET_TOKEN = os.getenv('WEBHOOK_SECRET_TOKEN', '')
+        self.WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', '5000'))
+
+        # Validate bot mode
+        if self.BOT_MODE not in ['polling', 'webhook']:
+            logger.warning(f"Invalid BOT_MODE '{self.BOT_MODE}', using 'polling'")
+            self.BOT_MODE = 'polling'
 
     def _get_default_rss_feeds(self):
         """Get default RSS feeds"""
