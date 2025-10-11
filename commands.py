@@ -2,16 +2,18 @@ import requests
 import logging
 from datetime import datetime
 from config import Config
+from rss_handler import RSSHandler
 
 logger = logging.getLogger(__name__)
 
 class CommandHandler:
     def __init__(self):
         self.config = Config()
+        self.rss_handler = RSSHandler(self.config)
         self.commands = {
             '/list': self.list_commands,
             '/help': self.list_commands,
-            '/weather': self.get_weather,
+            '/rss_news': self.get_rss_news,
             '/news': self.get_news,
             '/quote': self.get_quote
         }
@@ -25,9 +27,9 @@ class CommandHandler:
 • `/list` - Show all available commands
 • `/help` - Show this help message
 
-🌤️ *Weather Information:*
-• `/weather [city]` - Get current weather for a city
-  Example: `/weather Beijing` or `/weather London`
+📡 *RSS News Feeds:*
+• `/rss_news` - Get latest news from RSS feeds
+  Fetches from multiple configurable RSS sources
 
 📰 *News Headlines:*
 • `/news [country]` - Get latest news headlines with summaries
@@ -39,71 +41,68 @@ class CommandHandler:
 • `/quote` - Get a random inspirational quote
 
 *Tips:*
-• Use city names in English for weather
+• RSS feeds are automatically deduplicated to prevent duplicates
 • Use country codes for news (cn, us, uk, etc.) or topic keywords
 • All commands are case-insensitive
-• News includes summaries and original source links
+• RSS news and GNews both include summaries and original source links
         """
         return help_text.strip()
     
-    def get_weather(self, command, full_message, user_id):
-        """Get weather information for a city"""
+    def get_rss_news(self, command, full_message, user_id):
+        """Get latest news from RSS feeds"""
         try:
-            # Parse city from command
-            parts = full_message.strip().split()
-            if len(parts) > 1:
-                city = ' '.join(parts[1:])
-            else:
-                city = self.config.DEFAULT_CITY
-            
-            if not self.config.WEATHER_API_KEY:
-                return "⚠️ Weather API key not configured. Please set WEATHER_API_KEY environment variable."
-            
-            # Make API request
-            params = {
-                'q': city,
-                'appid': self.config.WEATHER_API_KEY,
-                'units': 'metric',  # Celsius
-                'lang': 'en'
-            }
-            
-            response = requests.get(self.config.WEATHER_API_URL, params=params, timeout=10)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if data.get('cod') != 200:
-                return f"❌ Weather information not found for '{city}'. Please check the city name."
-            
-            # Extract weather information
-            weather = data['weather'][0]
-            main = data['main']
-            wind = data.get('wind', {})
-            
-            # Format weather response
-            weather_text = f"""
-🌤️ *Weather in {data['name']}, {data['sys']['country']}*
+            logger.info(f"Fetching RSS news for user {user_id}")
 
-🌡️ **Temperature:** {main['temp']}°C (feels like {main['feels_like']}°C)
-☁️ **Condition:** {weather['main']} - {weather['description'].title()}
-💧 **Humidity:** {main['humidity']}%
-🌬️ **Wind:** {wind.get('speed', 0)} m/s
-📊 **Pressure:** {main['pressure']} hPa
+            # Get latest articles from RSS feeds
+            articles = self.rss_handler.get_latest_news(max_total=10)
 
-🕐 *Updated at:* {datetime.now().strftime('%H:%M:%S')}
-            """.strip()
-            
-            return weather_text
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Weather API error: {e}")
-            return "❌ Failed to fetch weather information. Please try again later."
-        except KeyError as e:
-            logger.error(f"Weather data parsing error: {e}")
-            return "❌ Invalid weather data received."
+            if not articles:
+                return """
+📡 *RSS News Update*
+
+🔍 *No new articles found*
+
+This means you've already seen all recent articles, or there are no new articles from your RSS feeds.
+
+*Configured RSS sources:* {} feeds
+*Next check:* Try again in a few minutes for new content
+
+🕐 *Updated at:* {}
+                """.format(
+                    len(self.config.RSS_FEEDS),
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                ).strip()
+
+            # Format RSS news response
+            rss_text = f"📡 *Latest RSS News*\n\n"
+            rss_text += f"📊 *Found {len(articles)} new articles*\n\n"
+
+            for i, article in enumerate(articles, 1):
+                title = article.get('title', 'No title')
+                summary = article.get('summary', '')
+                source = article.get('source', 'Unknown')
+                link = article.get('link', '')
+                category = article.get('category', 'general')
+                published = article.get('published', '')
+
+                rss_text += f"{i}. **{title}**\n"
+                if summary:
+                    rss_text += f"   📝 *{summary}*\n"
+                rss_text += f"   📺 *Source: {source} ({category})*\n"
+                if link:
+                    rss_text += f"   🔗 [Read full article]({link})\n"
+                if published:
+                    rss_text += f"   📅 *{published}*\n"
+                rss_text += "\n"
+
+            rss_text += f"🕐 *Updated at:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            rss_text += f"\n🔄 *Articles are deduplicated across all feeds*"
+
+            return rss_text.strip()
+
         except Exception as e:
-            logger.error(f"Unexpected error in weather command: {e}")
-            return "❌ An error occurred while fetching weather information."
+            logger.error(f"Unexpected error in RSS news command: {e}")
+            return "❌ An error occurred while fetching RSS news. Please try again later."
     
     def get_news(self, command, full_message, user_id):
         """Get latest news headlines with summaries using GNews API"""

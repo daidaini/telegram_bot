@@ -7,9 +7,10 @@ A Flask-based Telegram bot service that provides various information services us
 ### Available Commands
 
 1. **/list** - Display all available commands and their descriptions
-2. **/weather [city]** - Get current weather information for any city
-   - Example: `/weather Beijing` or `/weather London`
-   - Uses OpenWeatherMap API
+2. **/rss_news** - Get latest news from RSS feeds
+   - Fetches from multiple configurable RSS sources
+   - Automatic deduplication prevents showing same articles
+   - Uses feedparser library
 3. **/news [country|topic]** - Get latest news headlines with summaries
    - Example: `/news cn` (China) or `/news us` (USA)
    - Example: `/news technology` or `/news sports` (topics)
@@ -21,7 +22,8 @@ A Flask-based Telegram bot service that provides various information services us
 
 - **Framework**: Flask 2.3.3
 - **Communication**: Telegram Bot API with long polling
-- **External APIs**: OpenWeatherMap, GNews, Quotable
+- **External APIs**: GNews, Quotable
+- **RSS Feeds**: Configurable RSS sources with deduplication
 - **Configuration**: Environment variables with .env file support
 
 ## Installation
@@ -58,10 +60,15 @@ nano .env
 2. Get your bot token
 3. Add to `.env`: `TELEGRAM_BOT_TOKEN=your_bot_token_here`
 
-#### Weather API Key (Optional)
-1. Sign up at [OpenWeatherMap](https://openweathermap.org/api)
-2. Get your free API key
-3. Add to `.env`: `WEATHER_API_KEY=your_weather_api_key_here`
+#### RSS Feed Configuration (Optional)
+The bot comes with default RSS feeds (BBC, Reuters, CNN), but you can configure custom feeds:
+
+1. Edit your `.env` file
+2. Add custom RSS feeds as JSON:
+   ```
+   RSS_FEEDS=[{"name": "Feed Name", "url": "https://example.com/rss.xml", "category": "general"}]
+   ```
+3. Set maximum articles per feed: `MAX_ARTICLES_PER_FEED=3`
 
 #### News API Key (Optional)
 1. Sign up at [GNews](https://gnews.io/)
@@ -70,15 +77,19 @@ nano .env
 
 ## Usage
 
-### Testing the News Feature
+### Testing the Features
 
-Before running the bot, you can test the news functionality:
+Before running the bot, you can test the functionality:
 
 ```bash
+# Test GNews integration
 python test_news.py
+
+# Test RSS feeds functionality
+python test_rss.py
 ```
 
-This will test various news commands without requiring Telegram integration.
+These scripts test various commands without requiring Telegram integration.
 
 ### Running the Bot
 
@@ -104,7 +115,9 @@ telegram_bot/
 ├── app.py              # Main Flask application and bot logic
 ├── config.py           # Configuration management
 ├── commands.py         # Command handlers for bot functionality
-├── test_news.py        # Test script for news functionality
+├── rss_handler.py      # RSS feed fetching and deduplication logic
+├── test_news.py        # Test script for GNews functionality
+├── test_rss.py         # Test script for RSS functionality
 ├── requirements.txt    # Python dependencies
 ├── .env.example        # Environment variables template
 └── README.md          # This documentation
@@ -112,11 +125,11 @@ telegram_bot/
 
 ## API Integration Details
 
-### Weather API
-- **Provider**: OpenWeatherMap
-- **Endpoint**: Current weather data
-- **Features**: Temperature, humidity, wind speed, weather conditions
-- **Units**: Metric (Celsius)
+### RSS Feeds
+- **Library**: feedparser
+- **Sources**: Configurable RSS feeds (default: BBC, Reuters, CNN)
+- **Features**: Automatic deduplication, caching, configurable limits
+- **Cache**: Tracks seen articles for 7 days to prevent duplicates
 
 ### News API
 - **Provider**: GNews
@@ -138,9 +151,9 @@ telegram_bot/
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | - | Telegram bot token from @BotFather |
-| `WEATHER_API_KEY` | Optional | - | OpenWeatherMap API key |
 | `GNEWS_API_KEY` | Optional | - | GNews API key |
-| `DEFAULT_CITY` | No | Beijing | Default city for weather queries |
+| `RSS_FEEDS` | Optional | Default feeds | JSON array of RSS feed configurations |
+| `MAX_ARTICLES_PER_FEED` | No | 3 | Maximum articles to fetch per RSS feed |
 | `DEFAULT_NEWS_COUNTRY` | No | cn | Default country for news queries |
 | `DEFAULT_NEWS_LANGUAGE` | No | zh | Default language for news (zh=Chinese) |
 
@@ -202,10 +215,10 @@ CMD ["python", "app.py"]
    - Check for extra spaces or characters
    - Ensure bot is enabled
 
-2. **Weather API Errors**
-   - Check OpenWeatherMap API key validity
-   - Verify city name spelling
-   - Check API quota limits
+2. **RSS Feed Errors**
+   - Check RSS feed URLs are accessible
+   - Verify RSS feed format is valid
+   - Ensure network connectivity to feed sources
 
 3. **News API Errors**
    - Verify GNews API key validity
