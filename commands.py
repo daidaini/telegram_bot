@@ -49,27 +49,27 @@ class CommandHandler:
     def list_commands(self, command, full_message, user_id):
         """List all available commands"""
         help_text = """
-🤖 *机器人可用命令：*
+🤖 机器人可用命令：
 
-📋 *信息命令：*
+📋 信息命令：
 • `/list` - 显示所有可用命令
 • `/help` - 显示此帮助信息
 
-📡 *RSS新闻订阅：*
+📡 RSS新闻订阅：
 • `/rss_news` - 获取RSS源最新新闻
   从多个可配置的RSS源获取新闻
   (可自动转发到指定频道)
 
-📰 *新闻头条：*
+📰 新闻头条：
 • `/news [国家]` - 获取指定国家最新新闻摘要
   示例：`/news cn` (中国) 或 `/news us` (美国)
 • `/news [主题]` - 获取特定主题新闻
   示例：`/news technology` 或 `/news sports`
 
-💭 *励志名言：*
+💭 励志名言：
 • `/quote` - 获取随机励志名言
 
-*使用提示：*
+使用提示：
 • RSS源自动去重，避免重复内容
 • 使用国家代码查询新闻 (cn, us, uk 等) 或主题关键词
 • 所有命令不区分大小写
@@ -88,24 +88,23 @@ class CommandHandler:
             # Format user response
             if not articles:
                 user_response = """
-📡 *RSS新闻更新*
+📡 RSS新闻更新
 
-🔍 *未发现新文章*
+🔍 未发现新文章
 
 这可能意味着您已经看过所有最新文章，或者您的RSS源中没有新文章。
 
-*配置的RSS源数量：* {} 个
-*下次检查：* 几分钟后重试以获取新内容
+配置的RSS源数量： {} 个
+下次检查： 几分钟后重试以获取新内容
 
-🕐 *更新时间：* {}
+🕐 更新时间： {}
                 """.format(
                     len(self.config.RSS_FEEDS),
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 ).strip()
             else:
                 # Format RSS news response for user
-                user_response = f"📡 *最新RSS新闻*\n\n"
-                user_response += f"📊 *发现 {len(articles)} 篇新文章*\n\n"
+                user_response = f"📊 发布 {len(articles)} 篇新文章\n\n"
 
                 for i, article in enumerate(articles, 1):
                     title = article.get('title', '无标题')
@@ -115,18 +114,17 @@ class CommandHandler:
                     category = article.get('category', '综合')
                     published = article.get('published', '')
 
-                    user_response += f"{i}. **{title}**\n"
+                    user_response += f"{i}. {title}\n"
                     if summary:
-                        user_response += f"   📝 *{summary}*\n"
-                    user_response += f"   📺 *来源：{source} ({category})*\n"
+                        user_response += f"   📝 {summary}\n"
+                    user_response += f"   📺 来源：{source} ({category})\n"
                     if link:
                         user_response += f"   🔗 [阅读全文]({link})\n"
                     if published:
-                        user_response += f"   📅 *{published}*\n"
+                        user_response += f"   📅 {published}\n"
                     user_response += "\n"
 
-                user_response += f"🕐 *更新时间：* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                user_response += f"\n🔄 *文章已自动去重*"
+                user_response += f"🕐 更新时间： {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
             # Handle channel forwarding if enabled and only if there are new articles
             if (self.config.ENABLE_RSS_FORWARDING and
@@ -147,14 +145,14 @@ class CommandHandler:
 
                     if forward_result:
                         logger.info(f"Successfully forwarded RSS news to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
-                        user_response += f"\n\n✅ *内容已转发到 @{self.config.RSS_FORWARD_TO_CHANNEL}*"
+                        user_response += f"\n\n✅ 内容已转发到 @{self.config.RSS_FORWARD_TO_CHANNEL}"
                     else:
                         logger.warning(f"Failed to forward RSS news to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
-                        user_response += f"\n\n⚠️ *频道转发失败*"
+                        user_response += f"\n\n⚠️ 频道转发失败"
 
                 except Exception as e:
                     logger.error(f"Error forwarding RSS news to channel: {e}")
-                    user_response += f"\n\n⚠️ *频道转发错误：* {str(e)}"
+                    user_response += f"\n\n⚠️ 频道转发错误： {str(e)}"
 
             return escape_markdown(user_response.strip()) + "\n\n#rss_news"
 
@@ -209,7 +207,7 @@ class CommandHandler:
                 return f"📰 未找到 '{location_name}' 的相关新闻。\n\n#no_results"
 
             # Format news response
-            news_text = f"📰 *最新新闻头条 ({location_name})*\n\n"
+            news_text = f"📰 最新新闻头条 ({location_name})\n\n"
 
             for i, article in enumerate(articles, 1):
                 title = article.get('title', '无标题')
@@ -223,9 +221,9 @@ class CommandHandler:
                 if not summary:
                     summary = "暂无摘要"
 
-                news_text += f"{i}. **{title}**\n"
-                news_text += f"   📝 *{summary}*\n"
-                news_text += f"   📺 *来源：{source}*\n"
+                news_text += f"{i}. {title}\n"
+                news_text += f"   📝 {summary}\n"
+                news_text += f"   📺 来源：{source}\n"
                 if url:
                     news_text += f"   🔗 [阅读全文]({url})\n"
                 if published_date:
@@ -233,15 +231,16 @@ class CommandHandler:
                     try:
                         pub_date = datetime.fromisoformat(published_date.replace('Z', '+00:00'))
                         formatted_date = pub_date.strftime('%Y-%m-%d %H:%M')
-                        news_text += f"   📅 *{formatted_date}*\n"
+                        news_text += f"   📅 {formatted_date}\n"
                     except:
                         pass
                 news_text += "\n"
 
-            news_text += f"🕐 *更新时间：* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            news_text += f"\n📊 *数据来源：GNews.io*"
+            news_text += f"🕐 更新时间： {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            news_text += f"\n📊 数据来源：GNews.io"
 
-            return escape_markdown(news_text.strip()) + "\n\n#news_headlines"
+            #return escape_markdown(news_text.strip()) + "\n\n#news_headlines"
+            return news_text.strip()
 
         except requests.exceptions.RequestException as e:
             logger.error(f"GNews API error: {e}")
@@ -267,13 +266,13 @@ class CommandHandler:
 
             # Format quote response
             formatted_quote = f"""
-💭 **今日名言：**
+💭 今日名言：
 
 _"{quote_text}"_
 
 🖋️ — {author}
 
-🕐 *{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
+🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             """.strip()
 
             return escape_markdown(formatted_quote.strip()) + "\n\n#daily_quote"
@@ -282,13 +281,13 @@ _"{quote_text}"_
             logger.error(f"Quote API error: {e}")
             # Fallback to a static quote if API fails
             return """
-💭 **今日名言：**
+💭 今日名言：
 
 _"成就伟大事业的唯一方法是热爱你所做的工作。"_
 
 🖋️ — 史蒂夫·乔布斯
 
-🕐 *备用名言 - API暂时不可用*
+🕐 备用名言 - API暂时不可用
             """.strip() + "\n\n#daily_quote"
         except Exception as e:
             logger.error(f"Unexpected error in quote command: {e}")
