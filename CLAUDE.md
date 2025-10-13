@@ -34,6 +34,12 @@ Commands are registered in `CommandHandler` class and processed via `handle_comm
 - `/news [country|topic]` - Get news headlines via GNews API
 - `/quote` - Get random inspirational quotes
 
+### AI Content Generation
+- **OpenAI Integration**: `content_generator.py` provides AI-powered content generation with intent analysis
+- **Context Management**: Maintains conversation history in `user_context.md`
+- **Custom API Support**: Works with OpenAI-compatible APIs (Deepseek, local models)
+- **Multi-language Support**: Chinese and English content generation
+
 ## Development Commands
 
 ### Environment Setup
@@ -51,7 +57,7 @@ cp .env.example .env
 
 ### Running the Bot
 ```bash
-# Standard startup
+# Standard startup (recommended)
 python start_bot.py
 
 # Direct Flask app
@@ -68,7 +74,13 @@ python test_news.py              # Test GNews integration
 python test_rss.py               # Test RSS functionality
 python test_round_robin_rss.py   # Test round-robin RSS logic
 python test_channel_forwarding.py  # Test channel forwarding
+python test_message_send.py      # Test message sending functionality
+python test_webhook_integration.py  # Test webhook integration
+python test_round_robin_logic.py  # Test round-robin algorithm
 python system_status.py          # System status check
+
+# Test AI content generation (requires OpenAI API key)
+python content_generator.py "Your question here"
 ```
 
 ### Webhook Management
@@ -93,6 +105,9 @@ curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook"
 ### Optional API Keys
 - `GNEWS_API_KEY` - GNews API key for news headlines
 - `WEATHER_API_KEY` - OpenWeatherMap API key (currently unused)
+- `OPENAI_API_KEY` - OpenAI API key for AI content generation
+- `OPENAI_BASE_URL` - Custom API base URL for OpenAI-compatible APIs
+- `DEFAULT_MODEL` - Default model to use (e.g., gpt-3.5-turbo, gpt-4, deepseek-chat)
 
 ### RSS Configuration
 - `RSS_FEEDS` - JSON array of RSS feed configurations
@@ -125,6 +140,8 @@ curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook"
 - Comprehensive logging with structured format
 - User-friendly error messages with actionable suggestions
 - Network timeout handling (10 seconds for external APIs)
+- Markdown format error recovery with automatic fallback to plain text
+- Multi-language error messages (Chinese/English)
 
 ## Troubleshooting Common Issues
 
@@ -144,3 +161,9 @@ The bot automatically configures SSL context to handle certificate verification 
 - Ensure bot is added as administrator to target channel
 - Verify channel username is correct (without @ symbol)
 - Check `ENABLE_RSS_FORWARDING=true` in environment variables
+
+### OpenAI API Issues
+- Verify `OPENAI_API_KEY` is valid and active
+- Check `OPENAI_BASE_URL` if using custom API endpoints
+- Ensure sufficient API credits/quota available
+- Verify model compatibility with chosen API provider
