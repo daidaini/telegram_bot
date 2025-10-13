@@ -37,7 +37,7 @@ class TelegramBot:
     def health_check(self):
         return {"status": "healthy", "timestamp": datetime.now().isoformat()}
     
-    def send_message(self, chat_id, text, parse_mode='Markdown'):
+    def send_message(self, chat_id, text, parse_mode=None):
         """Send message to Telegram chat"""
         url = f"{self.api_url}/sendMessage"
         data = {
@@ -52,10 +52,27 @@ class TelegramBot:
             logger.info(f"Message sent to chat {chat_id}")
             return response.json()
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to send message: {e}")
+            # 获取详细错误信息
+            error_details = ""
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_json = e.response.json()
+                    error_details = error_json.get('description', 'No description')
+                    logger.error(f"Telegram API error: {error_details}")
+                except:
+                    error_details = str(e.response.text)
+                    logger.error(f"Telegram API response: {error_details}")
+
+            logger.error(f"Failed to send message to chat {chat_id}: {e}")
+
+            # 如果是Markdown格式错误，尝试不使用Markdown重新发送
+            if "can't parse entities" in str(error_details).lower() or "bad request" in str(e).lower():
+                logger.info("Retrying without Markdown format...")
+                return self.send_message(chat_id, text, parse_mode=None)
+
             return None
 
-    def send_message_to_channel(self, channel_username, text, parse_mode='Markdown'):
+    def send_message_to_channel(self, channel_username, text, parse_mode=None):
         """Send message to Telegram channel"""
         # Remove @ if present and format correctly
         channel_name = channel_username.lstrip('@')
@@ -74,7 +91,24 @@ class TelegramBot:
             logger.info(f"Message sent to channel {chat_id}")
             return response.json()
         except requests.exceptions.RequestException as e:
+            # 获取详细错误信息
+            error_details = ""
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_json = e.response.json()
+                    error_details = error_json.get('description', 'No description')
+                    logger.error(f"Telegram API error for channel: {error_details}")
+                except:
+                    error_details = str(e.response.text)
+                    logger.error(f"Telegram API response for channel: {error_details}")
+
             logger.error(f"Failed to send message to channel {chat_id}: {e}")
+
+            # 如果是Markdown格式错误，尝试不使用Markdown重新发送
+            if "can't parse entities" in str(error_details).lower() or "bad request" in str(e).lower():
+                logger.info("Retrying channel message without Markdown format...")
+                return self.send_message_to_channel(channel_username, text, parse_mode=None)
+
             return None
     
     def get_updates(self):
@@ -100,16 +134,16 @@ class TelegramBot:
         text = message.get('text', '')
         user_id = message['from']['id']
         username = message['from'].get('username', 'Unknown')
-        
+
         logger.info(f"Received message from {username} (ID: {user_id}): {text}")
-        
+
         # Handle commands
         if text.startswith('/'):
             command = text.lower().split()[0]
             response = self.command_handler.handle_command(command, text, user_id)
         else:
-            response = "I can only understand commands. Use /list to see available commands."
-        
+            response = "我只能理解命令。请使用 /list 查看可用命令。\n\n#invalid_input"
+
         self.send_message(chat_id, response)
     
     def start_polling(self):
@@ -150,7 +184,7 @@ class TelegramBot:
     def run(self):
         """Run the Flask app and start bot polling in background"""
         if not self.bot_token:
-            logger.error("BOT_TOKEN not configured!")
+            logger.error("未配置BOT_TOKEN!")
             return
         
         # Start polling in background thread

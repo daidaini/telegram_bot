@@ -3,11 +3,35 @@ import json
 import hashlib
 import logging
 import ssl
+import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Set, Optional
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+def escape_markdown(text):
+    """Escape special characters for Telegram Markdown"""
+    if not text:
+        return text
+
+    try:
+        # 移除可能导致问题的复杂markdown格式
+        # 处理链接 - 简化链接格式
+        text = re.sub(r'\[([^\]]*)\]\(([^)]*)\)', r'\1: \2', text)
+
+        # 移除所有的markdown格式符号，使用纯文本
+        text = text.replace('*', '')
+        text = text.replace('_', '')
+        text = text.replace('`', '')
+        text = text.replace('[', '')
+        text = text.replace(']', '')
+
+        # 保留emoji和基本的换行
+        return text
+    except Exception as e:
+        logger.warning(f"Error escaping markdown: {e}")
+        return text
 
 class RSSHandler:
     """Handles RSS feed fetching and deduplication"""
@@ -306,31 +330,31 @@ class RSSHandler:
         if not articles:
             return ""  # Return empty string when no articles to prevent empty channel posts
 
-        channel_header = f"@{channel_name}" if channel_name else "RSS News"
+        channel_header = f"@{channel_name}" if channel_name else "RSS新闻"
 
         # Format channel message
-        channel_text = f"📡 *{channel_header} RSS Update*\n\n"
-        channel_text += f"📊 *{len(articles)} New Articles*\n\n"
+        channel_text = f"📡 *{channel_header} RSS更新*\n\n"
+        channel_text += f"📊 *{len(articles)} 篇新文章*\n\n"
 
         for i, article in enumerate(articles, 1):
-            title = article.get('title', 'No title')
+            title = article.get('title', '无标题')
             summary = article.get('summary', '')
-            source = article.get('source', 'Unknown')
-            category = article.get('category', 'general')
+            source = article.get('source', '未知来源')
+            category = article.get('category', '综合')
             link = article.get('link', '')
 
             channel_text += f"🔹 **{title}**\n"
             if summary:
                 channel_text += f"📝 {summary}\n"
-            channel_text += f"📺 Source: {source} ({category})\n"
+            channel_text += f"📺 来源：{source} ({category})\n"
             if link:
-                channel_text += f"🔗 [Read more]({link})\n"
+                channel_text += f"🔗 [阅读全文]({link})\n"
             channel_text += "\n"
 
         channel_text += f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        channel_text += f"🔄 *Auto-posted via RSS Bot*"
+        channel_text += f"🔄 *RSS机器人自动发布*"
 
-        return channel_text
+        return escape_markdown(channel_text)
 
     def fetch_all_feeds_round_robin(self) -> List[Dict]:
         """Fetch one article from each RSS feed using round-robin logic"""
