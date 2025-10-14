@@ -1,9 +1,15 @@
 import requests
 import logging
 import re
+import sys
+import os
 from datetime import datetime
 from config import Config
 from rss_handler import RSSHandler
+
+# Add content_generator path for import
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from content_generator import OpenAIClient, parse_user_intent, generate_final_content, ContextManager
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +49,8 @@ class CommandHandler:
             '/help': self.list_commands,
             '/rss_news': self.get_rss_news,
             '/news': self.get_news,
-            '/quote': self.get_quote
+            '/quote': self.get_quote,
+            '/ask': self.ask_question
         }
     
     def list_commands(self, command, full_message, user_id):
@@ -69,11 +76,16 @@ class CommandHandler:
 💭 励志名言：
 • `/quote` - 获取随机励志名言
 
+🤖 AI问答：
+• `/ask [问题]` - 向AI助手提问
+  示例：`/ask 今天天气如何？` 或 `/ask 请解释量子计算`
+
 使用提示：
 • RSS源自动去重，避免重复内容
 • 使用国家代码查询新闻 (cn, us, uk 等) 或主题关键词
 • 所有命令不区分大小写
 • RSS新闻和GNews都包含摘要和原文链接
+• AI问答需要配置OpenAI API密钥
         """
         return escape_markdown(help_text.strip()) + "\n\n#bot_help"
     
@@ -292,7 +304,66 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
         except Exception as e:
             logger.error(f"Unexpected error in quote command: {e}")
             return "❌ 获取名言时发生错误。\n\n#error"
-    
+
+    def ask_question(self, command, full_message, user_id):
+        """Ask AI assistant a question using content_generator"""
+        try:
+            # Parse question from command
+            parts = full_message.strip().split(maxsplit=1)
+            if len(parts) < 2:
+                return "❌ 请提供问题内容。用法：`/ask [您的问题]`\n\n#usage_error"
+
+            question = parts[1].strip()
+            logger.info(f"User {user_id} asks: {question[:100]}...")
+
+            # Check OpenAI API configuration
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                return "⚠️ 未配置OpenAI API密钥，请设置OPENAI_API_KEY环境变量。\n\n#config_error"
+
+            base_url = os.getenv('OPENAI_BASE_URL')
+            default_model = os.getenv('DEFAULT_MODEL', 'gpt-3.5-turbo')
+
+            # Initialize OpenAI client
+            openai_client = OpenAIClient(api_key, base_url)
+
+            # Initialize context manager
+            context_manager = ContextManager()
+
+            # System prompt for AI assistant
+            system_prompt = """你是一个专业的AI助手，擅长回答各种问题并提供有用的信息。
+请确保回答：
+1. 内容准确、逻辑清晰
+2. 语言流畅、表达自然
+3. 回答简洁明了，重点突出
+4. 具有实用价值"""
+
+            # Step 1: Parse user intent
+            intent = parse_user_intent(openai_client, question, default_model)
+
+            # Step 2: Save intent to context
+            context_manager.add_context(intent)
+
+            # Step 3: Get latest contexts
+            latest_contexts = context_manager.get_latest_contexts(3)
+
+            # Step 4: Generate final response
+            response = generate_final_content(openai_client, question, latest_contexts, system_prompt, default_model)
+
+            # Format response for Telegram
+            formatted_response = f"""🤖 AI助手回复：
+
+{response}
+
+🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+📊 基于OpenAI模型：{default_model}"""
+
+            return escape_markdown(formatted_response.strip()) + "\n\n#ai_response"
+
+        except Exception as e:
+            logger.error(f"Error in ask command: {e}")
+            return f"❌ 处理问题时发生错误：{str(e)}\n\n请稍后重试或检查API配置。\n\n#error"
+
     def handle_command(self, command, full_message, user_id):
         """Handle incoming commands"""
         command = command.lower()

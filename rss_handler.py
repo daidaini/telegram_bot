@@ -330,11 +330,11 @@ class RSSHandler:
         if not articles:
             return ""  # Return empty string when no articles to prevent empty channel posts
 
-        #channel_header = f"@{channel_name}" if channel_name else "RSS新闻"
+        channel_header = f"@{channel_name}" if channel_name else "RSS新闻"
 
-        # Format channel message
-        #channel_text = f"📡 *{channel_header} RSS更新*\n\n"
-        #channel_text += f"📊 *{len(articles)} 篇新文章*\n\n"
+        # Initialize channel message
+        channel_text = f"📡 {channel_header} RSS更新\n\n"
+        channel_text += f"📊 {len(articles)} 篇新文章\n\n"
 
         for i, article in enumerate(articles, 1):
             title = article.get('title', '无标题')
@@ -351,10 +351,10 @@ class RSSHandler:
                 channel_text += f"🔗 [阅读全文]({link})\n"
             channel_text += "\n"
 
-        #channel_text += f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        #channel_text += f"🔄 *RSS机器人自动发布*"
+        channel_text += f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        channel_text += f"🔄 RSS机器人自动发布"
 
-        return channel_text
+        return escape_markdown(channel_text)
 
     def fetch_all_feeds_round_robin(self) -> List[Dict]:
         """Fetch one article from each RSS feed using round-robin logic"""
