@@ -94,7 +94,7 @@ class CommandHandler:
 • RSS新闻和GNews都包含摘要和原文链接
 • AI问答需要配置OpenAI API密钥
         """
-        return escape_markdown(help_text.strip()) + "\n\n#bot_help"
+        return escape_markdown(help_text.strip())
     
     def get_rss_news(self, command, full_message, user_id):
         """Get latest news from RSS feeds with optional channel forwarding"""
@@ -134,16 +134,16 @@ class CommandHandler:
                     published = article.get('published', '')
 
                     user_response += f"{i}. {title}\n"
+                    user_response += f"   📺 来源：{source} ({category})\n"
                     if summary:
                         user_response += f"   📝 {summary}\n"
-                    user_response += f"   📺 来源：{source} ({category})\n"
                     if link:
                         user_response += f"   🔗 [阅读全文]({link})\n"
                     if published:
                         user_response += f"   📅 {published}\n"
-                    user_response += "\n"
+                    user_response += f"#{category} #rss\n\n"
 
-                user_response += f"🕐 更新时间： {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                #user_response += f"🕐 更新时间： {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
             # Handle channel forwarding if enabled and only if there are new articles
             if (self.config.ENABLE_RSS_FORWARDING and
@@ -164,16 +164,16 @@ class CommandHandler:
 
                     if forward_result:
                         logger.info(f"Successfully forwarded RSS news to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
-                        user_response += f"\n\n✅ 内容已转发到 @{self.config.RSS_FORWARD_TO_CHANNEL}"
+                        #user_response += f"\n\n✅ 内容已转发到 @{self.config.RSS_FORWARD_TO_CHANNEL}"
                     else:
                         logger.warning(f"Failed to forward RSS news to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
-                        user_response += f"\n\n⚠️ 频道转发失败"
+                        #user_response += f"\n\n⚠️ 频道转发失败"
 
                 except Exception as e:
                     logger.error(f"Error forwarding RSS news to channel: {e}")
-                    user_response += f"\n\n⚠️ 频道转发错误： {str(e)}"
+                    #user_response += f"\n\n⚠️ 频道转发错误： {str(e)}"
 
-            return escape_markdown(user_response.strip()) + "\n\n#rss_news"
+            return escape_markdown(user_response.strip())
 
         except Exception as e:
             logger.error(f"Unexpected error in RSS news command: {e}")
@@ -255,9 +255,6 @@ class CommandHandler:
                         pass
                 news_text += "\n"
 
-            news_text += f"🕐 更新时间： {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            news_text += f"\n📊 数据来源：GNews.io"
-
             #return escape_markdown(news_text.strip()) + "\n\n#news_headlines"
             return news_text.strip()
 
@@ -292,7 +289,7 @@ class CommandHandler:
             # Format response
             formatted_response = format_quote_response(quote_data)
 
-            return escape_markdown(formatted_response.strip()) + "\n\n#ai_quote"
+            return escape_markdown(formatted_response.strip())
 
         except Exception as e:
             logger.error(f"Error in AI quote command: {e}")
@@ -384,7 +381,7 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
             # Format response for Telegram
             formatted_response = response
 
-            return escape_markdown(formatted_response.strip()) + "\n\n#ai_response"
+            return escape_markdown(formatted_response.strip())
 
         except Exception as e:
             logger.error(f"Error in ask command: {e}")
