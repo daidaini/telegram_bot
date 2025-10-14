@@ -32,7 +32,8 @@ Commands are registered in `CommandHandler` class and processed via `handle_comm
 - `/list` or `/help` - Display all available commands
 - `/rss_news` - Get latest news from RSS feeds with optional channel forwarding
 - `/news [country|topic]` - Get news headlines via GNews API
-- `/quote` - Get random inspirational quotes
+- `/quote` - Get AI-generated inspirational quotes with detailed analysis (author info, historical background, modern relevance, related references, and practical applications)
+- `/ask [question]` - Ask AI assistant a question using OpenAI API
 
 ### AI Content Generation
 - **OpenAI Integration**: `content_generator.py` provides AI-powered content generation with intent analysis
@@ -68,18 +69,28 @@ gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
 ### Testing Commands
-```bash
-# Test individual components
-python test_news.py              # Test GNews integration
-python test_rss.py               # Test RSS functionality
-python test_round_robin_rss.py   # Test round-robin RSS logic
-python test_channel_forwarding.py  # Test channel forwarding
-python test_message_send.py      # Test message sending functionality
-python test_webhook_integration.py  # Test webhook integration
-python test_round_robin_logic.py  # Test round-robin algorithm
-python system_status.py          # System status check
+All tests are located in the `Test/` directory. Run tests from the Test directory:
 
-# Test AI content generation (requires OpenAI API key)
+```bash
+# Run all tests
+cd Test && python3 run_all_tests.py
+
+# Run individual tests
+cd Test
+python3 test_ask_command.py          # Test AI Q&A functionality
+python3 test_rss.py                  # Test RSS functionality
+python3 test_channel_forwarding.py   # Test channel forwarding
+python3 test_news.py                 # Test GNews integration
+python3 test_round_robin_rss.py       # Test round-robin RSS logic
+python3 test_message_send.py         # Test message sending functionality
+python3 test_webhook_integration.py  # Test webhook integration
+python3 test_round_robin_logic.py    # Test round-robin algorithm
+python3 demo_command_parsing.py      # Demo command parsing process
+
+# System status (run from root)
+python system_status.py              # System status check
+
+# Test AI content generation directly (requires OpenAI API key)
 python content_generator.py "Your question here"
 ```
 
@@ -128,12 +139,27 @@ curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook"
 - Implements date parsing with `python-dateutil` for flexible date format handling
 - Cache structure includes metadata: `{'title': '', 'link': '', 'feed_name': '', 'fetched_at': '', 'published_at': ''}`
 - Round-robin fetching ensures balanced content distribution across feeds
+- Channel message formatting with automatic markdown escaping
 
 ### Bot Message Handling
 - Long polling with configurable timeout (30 seconds default)
 - Background threading for non-blocking operation in polling mode
 - Flask routes for health checks (`/health`) and webhook endpoint (`/webhook`)
-- Markdown formatting for all bot responses
+- Markdown formatting for all bot responses with fallback to plain text
+- Command parsing uses `split(maxsplit=1)` to separate commands from parameters
+
+### AI Integration Architecture
+- Content generation via `OpenAIClient` wrapper with custom base URL support
+- Intent analysis and context management for conversational AI responses
+- Context persistence in `user_context.md` file for conversation history
+- Multi-step content generation: intent parsing → context retrieval → response generation
+- **Enhanced Quote System**: AI-generated inspirational quotes with comprehensive analysis including:
+  - Deep philosophical interpretation of quotes
+  - Historical context and author background
+  - Modern relevance and practical applications
+  - Related references from historical and contemporary figures
+  - Smart JSON parsing with markdown code block handling
+  - Robust fallback mechanisms for API failures
 
 ### Error Handling Patterns
 - Graceful degradation for API failures (static quotes fallback)
@@ -167,3 +193,14 @@ The bot automatically configures SSL context to handle certificate verification 
 - Check `OPENAI_BASE_URL` if using custom API endpoints
 - Ensure sufficient API credits/quota available
 - Verify model compatibility with chosen API provider
+
+## Test Organization
+
+All test code is centralized in the `Test/` directory with the following structure:
+- **Core functionality tests**: `test_ask_command.py`, `test_rss.py`, `test_news.py`
+- **Logic tests**: `test_round_robin_logic.py`, `test_round_robin_rss.py`
+- **Integration tests**: `test_channel_forwarding.py`, `test_message_send.py`, `test_webhook_integration.py`
+- **Demos**: `demo_command_parsing.py`
+- **Test utilities**: `run_all_tests.py` (batch test runner), `update_imports.py` (path updater)
+
+Test files use parent directory imports: `sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))`

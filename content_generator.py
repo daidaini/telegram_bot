@@ -148,6 +148,145 @@ def generate_final_content(openai_client: OpenAIClient, user_input: str, context
     return openai_client.chat_completion(messages, model)
 
 
+def generate_inspirational_quote(openai_client: OpenAIClient, model: str) -> dict:
+    """Generate a random inspirational quote with detailed analysis"""
+
+    # Step 1: Generate the quote
+    quote_prompt = """请生成一句富有哲理和启发性的励志名言。要求：
+1. 内容积极向上，具有深度思考价值
+2. 语言简洁优美，易于记忆和传播
+3. 涵盖人生、成功、成长、智慧等主题
+4. 避免过于常见或陈词滥调的内容
+5. 提供一个虚构但合理的作者姓名和背景
+
+请按照以下JSON格式返回：
+{
+    "quote": "名言内容",
+    "author": "作者姓名",
+    "background": "作者背景简介"
+}"""
+
+    messages = [
+        {"role": "system", "content": "你是一个专业的名言创作助手，擅长创作富有哲理和启发性的名言警句。"},
+        {"role": "user", "content": quote_prompt}
+    ]
+
+    try:
+        quote_response = openai_client.chat_completion(messages, model)
+
+        # Parse JSON response - handle markdown code blocks
+        import json
+        import re
+
+        # Extract JSON from response (handle markdown code blocks)
+        json_match = re.search(r'```json\s*\n(.*?)\n```', quote_response, re.DOTALL)
+        if json_match:
+            json_text = json_match.group(1)
+        else:
+            # Try to find JSON object directly
+            json_match = re.search(r'\{.*\}', quote_response, re.DOTALL)
+            if json_match:
+                json_text = json_match.group(0)
+            else:
+                json_text = quote_response
+
+        quote_data = json.loads(json_text)
+
+        # Validate required fields
+        if not all(key in quote_data for key in ['quote', 'author', 'background']):
+            raise ValueError("Missing required fields in quote data")
+
+        # Step 2: Generate detailed analysis
+        analysis_prompt = f"""请对以下名言进行深度分析：
+
+名言："{quote_data['quote']}"
+作者：{quote_data['author']}
+作者背景：{quote_data['background']}
+
+请提供详细的分析，包括：
+1. **名言解读**：解释这句名言的深层含义和哲学思想
+2. **历史背景**：分析这句名言产生的历史时代背景和社会环境
+3. **现实意义**：探讨这句名言在当代社会的应用价值和指导意义
+4. **相关引用**：提供2-3个历史上或当代名人引用类似思想的例子
+5. **实践建议**：给出如何在生活中践行这句名言的具体建议
+
+请保持分析的专业性和深度，语言优美流畅，字数控制在800-1200字之间。"""
+
+        analysis_messages = [
+            {"role": "system", "content": "你是一位资深的思想学者和文学评论家，擅长对名言警句进行深度解读和分析。"},
+            {"role": "user", "content": analysis_prompt}
+        ]
+
+        analysis = openai_client.chat_completion(analysis_messages, model)
+
+        return {
+            'quote': quote_data['quote'],
+            'author': quote_data['author'],
+            'background': quote_data['background'],
+            'analysis': analysis
+        }
+
+    except (json.JSONDecodeError, ValueError, KeyError) as e:
+        # Fallback with detailed analysis
+        fallback_quote = "成功不是终点，失败不是终结，唯有勇气才是永恒。"
+        fallback_author = "温斯顿·丘吉尔"
+        fallback_background = "英国首相，二战时期领导人物，以坚韧不拔的意志和卓越的领导才能著称。"
+
+        # Generate analysis for fallback quote
+        analysis_prompt = f"""请对以下名言进行深度分析：
+
+名言："{fallback_quote}"
+作者：{fallback_author}
+作者背景：{fallback_background}
+
+请提供详细的分析，包括：
+1. **名言解读**：解释这句名言的深层含义和哲学思想
+2. **历史背景**：分析这句名言产生的历史时代背景和社会环境
+3. **现实意义**：探讨这句名言在当代社会的应用价值和指导意义
+4. **相关引用**：提供2-3个历史上或当代名人引用类似思想的例子
+5. **实践建议**：给出如何在生活中践行这句名言的具体建议
+
+请保持分析的专业性和深度，语言优美流畅，字数控制在800-1200字之间。"""
+
+        analysis_messages = [
+            {"role": "system", "content": "你是一位资深的思想学者和文学评论家，擅长对名言警句进行深度解读和分析。"},
+            {"role": "user", "content": analysis_prompt}
+        ]
+
+        try:
+            analysis = openai_client.chat_completion(analysis_messages, model)
+        except:
+            analysis = "这句名言体现了丘吉尔对人生奋斗精神的深刻理解，强调了在面对挑战和困难时保持勇气和坚持不懈的重要性。"
+
+        return {
+            'quote': fallback_quote,
+            'author': fallback_author,
+            'background': fallback_background,
+            'analysis': analysis
+        }
+    except Exception as e:
+        raise Exception(f"Failed to generate quote: {str(e)}")
+
+
+def format_quote_response(quote_data: dict) -> str:
+    """Format the quote and analysis into a readable response"""
+
+    response = f"""💭 今日智慧名言：
+
+_{quote_data['quote']}_
+
+🖋️ 作者：{quote_data['author']}
+📚 作者简介：{quote_data['background']}
+
+📖 名言深度解读：
+
+{quote_data['analysis']}
+
+"""
+
+    return response.strip()
+
+
 def main():
     """Main function to orchestrate the content generation process"""
     parser = argparse.ArgumentParser(description='AI Content Generator with Context Management')

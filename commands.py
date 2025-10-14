@@ -9,7 +9,14 @@ from rss_handler import RSSHandler
 
 # Add content_generator path for import
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from content_generator import OpenAIClient, parse_user_intent, generate_final_content, ContextManager
+from content_generator import (
+    OpenAIClient,
+    parse_user_intent,
+    generate_final_content,
+    ContextManager,
+    generate_inspirational_quote,
+    format_quote_response
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +80,8 @@ class CommandHandler:
 • `/news [主题]` - 获取特定主题新闻
   示例：`/news technology` 或 `/news sports`
 
-💭 励志名言：
-• `/quote` - 获取随机励志名言
+💭 AI智慧名言：
+• `/quote` - 获取AI生成的励志名言及深度解读
 
 🤖 AI问答：
 • `/ask [问题]` - 向AI助手提问
@@ -262,22 +269,48 @@ class CommandHandler:
             return "❌ 获取新闻时发生错误。\n\n#error"
     
     def get_quote(self, command, full_message, user_id):
-        """Get a random inspirational quote"""
+        """Get an AI-generated inspirational quote with detailed analysis"""
         try:
-            # Make API request
+            logger.info(f"Generating AI quote for user {user_id}")
+
+            # Check OpenAI API configuration
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                # Fallback to basic quote if OpenAI not configured
+                logger.warning("OpenAI API key not configured, using fallback quote")
+                return self._get_fallback_quote()
+
+            base_url = os.getenv('OPENAI_BASE_URL')
+            default_model = os.getenv('DEFAULT_MODEL', 'gpt-3.5-turbo')
+
+            # Initialize OpenAI client
+            openai_client = OpenAIClient(api_key, base_url)
+
+            # Generate quote and analysis
+            quote_data = generate_inspirational_quote(openai_client, default_model)
+
+            # Format response
+            formatted_response = format_quote_response(quote_data)
+
+            return escape_markdown(formatted_response.strip()) + "\n\n#ai_quote"
+
+        except Exception as e:
+            logger.error(f"Error in AI quote command: {e}")
+            return self._get_fallback_quote()
+
+    def _get_fallback_quote(self):
+        """Fallback quote method when AI is not available"""
+        try:
+            # Try the original API first
             response = requests.get(self.config.QUOTE_API_URL, timeout=10)
             response.raise_for_status()
-            
+
             data = response.json()
-            
             quote_text = data.get('content', '')
             author = data.get('author', 'Unknown')
-            
-            if not quote_text:
-                return "❌ 获取名言失败，请稍后重试。\n\n#api_error"
 
-            # Format quote response
-            formatted_quote = f"""
+            if quote_text:
+                formatted_quote = f"""
 💭 今日名言：
 
 _"{quote_text}"_
@@ -285,14 +318,15 @@ _"{quote_text}"_
 🖋️ — {author}
 
 🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-            """.strip()
+📊 来源：Quotable API
+                """.strip()
+                return escape_markdown(formatted_quote.strip()) + "\n\n#daily_quote"
 
-            return escape_markdown(formatted_quote.strip()) + "\n\n#daily_quote"
+        except Exception as e:
+            logger.warning(f"Quote API also failed: {e}")
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Quote API error: {e}")
-            # Fallback to a static quote if API fails
-            return """
+        # Final fallback to static quote
+        return """
 💭 今日名言：
 
 _"成就伟大事业的唯一方法是热爱你所做的工作。"_
@@ -300,10 +334,7 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
 🖋️ — 史蒂夫·乔布斯
 
 🕐 备用名言 - API暂时不可用
-            """.strip() + "\n\n#daily_quote"
-        except Exception as e:
-            logger.error(f"Unexpected error in quote command: {e}")
-            return "❌ 获取名言时发生错误。\n\n#error"
+        """.strip() + "\n\n#daily_quote"
 
     def ask_question(self, command, full_message, user_id):
         """Ask AI assistant a question using content_generator"""
@@ -351,12 +382,7 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
             response = generate_final_content(openai_client, question, latest_contexts, system_prompt, default_model)
 
             # Format response for Telegram
-            formatted_response = f"""🤖 AI助手回复：
-
-{response}
-
-🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-📊 基于OpenAI模型：{default_model}"""
+            formatted_response = response
 
             return escape_markdown(formatted_response.strip()) + "\n\n#ai_response"
 
