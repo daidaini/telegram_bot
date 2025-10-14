@@ -62,3 +62,7 @@ Test/
 rss_cache.json
 
 test_*
+
+demo_*
+
+user_context.md
