@@ -12,6 +12,7 @@ Usage:
 import os
 import re
 import argparse
+from datetime import datetime
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -285,6 +286,38 @@ _{quote_data['quote']}_
 """
 
     return response.strip()
+
+
+def format_quote_for_channel(quote_data: dict, channel_name: str = None) -> str:
+    """Format the quote for Telegram channel posting"""
+
+    channel_header = f"@{channel_name}" if channel_name else "智慧名言频道"
+
+    # Create a more concise version for channel (reduce analysis length for better readability)
+    analysis = quote_data['analysis']
+    if len(analysis) > 800:
+        # Truncate very long analysis for channel
+        analysis = analysis[:800] + "..."
+
+    channel_message = f"""📡 {channel_header} - 每日智慧分享
+
+💭 _{quote_data['quote']}_
+
+🖋️ {quote_data['author']}
+📚 {quote_data['background']}
+
+📖 精选解读：
+{analysis}
+
+✨ 每日思考：这句话如何在今天启发我们？
+
+🤖 AI智慧助手 • 深度生成
+🕐 {datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+#智慧名言 #每日分享 #AI解读
+"""
+
+    return channel_message.strip()
 
 
 def main():

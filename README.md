@@ -19,15 +19,19 @@ A Flask-based Telegram bot service that provides various information services us
    - Example: `/news cn` (China) or `/news us` (USA)
    - Example: `/news technology` or `/news sports` (topics)
    - Uses GNews API with summaries and original links
-4. **/quote** - Get a random inspirational quote
-   - Uses Quotable API
+4. **/quote** - Get AI-generated inspirational quotes with detailed analysis
+   - Uses OpenAI API to generate original quotes with deep philosophical analysis
+   - Includes author background, historical context, modern relevance, and practical applications
+   - Can auto-forward content to configured Telegram channel
+   - Smart forwarding: automatically shares wisdom with channel community
 
 ## Architecture
 
 - **Framework**: Flask 2.3.3
 - **Communication**: Telegram Bot API with long polling
-- **External APIs**: GNews, Quotable
+- **External APIs**: GNews, OpenAI (for AI-generated quotes)
 - **RSS Feeds**: Configurable RSS sources with deduplication
+- **AI Integration**: Smart content generation with context management
 - **Configuration**: Environment variables with .env file support
 
 ## Installation
@@ -89,6 +93,12 @@ Automatically forward RSS news to a Telegram channel when `/rss_news` is called:
 1. Sign up at [GNews](https://gnews.io/)
 2. Get your free API key
 3. Add to `.env`: `GNEWS_API_KEY=your_gnews_api_key_here`
+
+#### OpenAI API Key (Optional for AI Quotes)
+1. Get your OpenAI API key from [OpenAI Platform](https://platform.openai.com/)
+2. Add to `.env`: `OPENAI_API_KEY=your_openai_api_key_here`
+3. Optional: Custom API base URL: `OPENAI_BASE_URL=https://api.example.com/v1`
+4. Optional: Default model: `DEFAULT_MODEL=gpt-3.5-turbo`
 
 ## Usage
 
@@ -174,11 +184,16 @@ telegram_bot/
 - **Limit**: 5 articles per request
 - **Languages**: Supports multiple languages including Chinese (zh)
 
-### Quote API
-- **Provider**: Quotable
-- **Endpoint**: Random quotes
-- **Features**: Inspirational and educational quotes
-- **Fallback**: Static quote if API is unavailable
+### AI Quote Generation
+- **Provider**: OpenAI API (GPT models)
+- **Features**:
+  - Original inspirational quotes with deep philosophical analysis
+  - Author background and historical context
+  - Modern relevance and practical applications
+  - Related references from historical figures
+  - Smart JSON parsing with markdown handling
+  - Robust fallback mechanisms
+- **Fallback**: External quote APIs or static quotes if AI is unavailable
 
 ## Configuration Options
 
@@ -188,6 +203,9 @@ telegram_bot/
 |----------|----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | - | Telegram bot token from @BotFather |
 | `GNEWS_API_KEY` | Optional | - | GNews API key |
+| `OPENAI_API_KEY` | Optional | - | OpenAI API key for AI quote generation |
+| `OPENAI_BASE_URL` | Optional | - | Custom API base URL for OpenAI-compatible APIs |
+| `DEFAULT_MODEL` | Optional | gpt-3.5-turbo | Default model for AI content generation |
 | `RSS_FEEDS` | Optional | Default feeds | JSON array of RSS feed configurations |
 | `MAX_ARTICLES_PER_FEED` | No | 3 | Maximum articles to fetch per RSS feed |
 | `RSS_FORWARD_TO_CHANNEL` | Optional | - | Channel username for auto-forwarding |

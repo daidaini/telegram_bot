@@ -15,7 +15,8 @@ from content_generator import (
     generate_final_content,
     ContextManager,
     generate_inspirational_quote,
-    format_quote_response
+    format_quote_response,
+    format_quote_for_channel
 )
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ class CommandHandler:
 
 💭 AI智慧名言：
 • `/quote` - 获取AI生成的励志名言及深度解读
+  (可自动转发到指定频道)
 
 🤖 AI问答：
 • `/ask [问题]` - 向AI助手提问
@@ -93,6 +95,7 @@ class CommandHandler:
 • 所有命令不区分大小写
 • RSS新闻和GNews都包含摘要和原文链接
 • AI问答需要配置OpenAI API密钥
+• RSS新闻和智慧名言可自动转发到配置的频道
         """
         return escape_markdown(help_text.strip())
     
@@ -286,8 +289,34 @@ class CommandHandler:
             # Generate quote and analysis
             quote_data = generate_inspirational_quote(openai_client, default_model)
 
-            # Format response
+            # Format response for user
             formatted_response = format_quote_response(quote_data)
+            formatted_response += f"\n\n🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n📊 基于OpenAI模型：{default_model}"
+
+            # Handle channel forwarding if enabled
+            if (self.config.ENABLE_RSS_FORWARDING and
+                self.config.RSS_FORWARD_TO_CHANNEL and
+                self.bot):
+                try:
+                    channel_message = format_quote_for_channel(
+                        quote_data,
+                        self.config.RSS_FORWARD_TO_CHANNEL
+                    )
+
+                    logger.info(f"Forwarding quote to channel: @{self.config.RSS_FORWARD_TO_CHANNEL}")
+                    forward_result = self.bot.send_message_to_channel(
+                        self.config.RSS_FORWARD_TO_CHANNEL,
+                        channel_message
+                    )
+
+                    if forward_result:
+                        logger.info(f"Successfully forwarded quote to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
+                        formatted_response += f"\n\n✅ 智慧名言已分享到 @{self.config.RSS_FORWARD_TO_CHANNEL}"
+                    else:
+                        logger.warning(f"Failed to forward quote to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
+
+                except Exception as e:
+                    logger.error(f"Error forwarding quote to channel: {e}")
 
             return escape_markdown(formatted_response.strip())
 
