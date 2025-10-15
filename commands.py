@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from config import Config
 from rss_handler import RSSHandler
+from hackernews_handler import HackerNewsHandler
 
 # Add content_generator path for import
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -51,6 +52,7 @@ class CommandHandler:
     def __init__(self, bot_instance=None):
         self.config = Config()
         self.rss_handler = RSSHandler(self.config)
+        self.hackernews_handler = HackerNewsHandler()
         self.bot = bot_instance  # Reference to bot instance for channel posting
         self.commands = {
             '/list': self.list_commands,
@@ -58,7 +60,8 @@ class CommandHandler:
             '/rss_news': self.get_rss_news,
             '/news': self.get_news,
             '/quote': self.get_quote,
-            '/ask': self.ask_question
+            '/ask': self.ask_question,
+            '/hacker_news': self.get_hacker_news
         }
     
     def list_commands(self, command, full_message, user_id):
@@ -89,12 +92,16 @@ class CommandHandler:
 • `/ask [问题]` - 向AI助手提问
   示例：`/ask 今天天气如何？` 或 `/ask 请解释量子计算`
 
+🔥 Hacker News AI精选：
+• `/hacker_news` - 获取Hacker News当日AI主题文章
+  自动搜索当天最新的AI相关文章并进行深度分析
+  (可自动转发到指定频道)
+
 使用提示：
 • RSS源自动去重，避免重复内容
 • 使用国家代码查询新闻 (cn, us, uk 等) 或主题关键词
 • 所有命令不区分大小写
-• RSS新闻和GNews都包含摘要和原文链接
-• RSS新闻和智慧名言可自动转发到配置的频道
+• RSS新闻、GNews、Hacker News和智慧名言可自动转发到配置的频道
         """
         return escape_markdown(help_text.strip())
     
@@ -384,6 +391,148 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
         except Exception as e:
             logger.error(f"Error in ask command: {e}")
             return f"❌ 处理问题时发生错误：{str(e)}\n\n请稍后重试或检查API配置。\n\n#error"
+
+    def get_hacker_news(self, command, full_message, user_id):
+        """Get latest AI-related article from Hacker News with AI analysis"""
+        try:
+            logger.info(f"Fetching Hacker News AI article for user {user_id}")
+
+            # Check OpenAI API configuration
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                return "⚠️ 未配置OpenAI API密钥，请设置OPENAI_API_KEY环境变量。\n\n#config_error"
+
+            base_url = os.getenv('OPENAI_BASE_URL')
+            default_model = os.getenv('DEFAULT_MODEL', 'gpt-3.5-turbo')
+
+            # Initialize OpenAI client
+            openai_client = OpenAIClient(api_key, base_url)
+
+            # Find AI-related article from today
+            article = self.hackernews_handler.find_ai_article_today()
+            if not article:
+                return """
+🔍 *Hacker News AI 搜索*
+
+📅 当天未找到AI相关文章
+
+今天 Hacker News 上可能没有发布新的AI主题文章，或者相关文章已被错过。
+
+🔍 **搜索范围：**
+• 当天发布的最新文章
+• 包含 AI、机器学习、深度学习等关键词
+• 技术文章和讨论
+
+⏰ **下次检查：** 几分钟后重试
+💡 **建议：** 可以稍后再次尝试此命令
+
+🤖 *Hacker News AI 机器人*
+                """.strip()
+
+            # Get article URL
+            article_url = article.get('url')
+            if not article_url:
+                # If no URL, it might be a text-only post
+                title = article.get('title', 'No title')
+                text = article.get('text', '')
+
+                user_response = f"""🤖 *Hacker News AI 文章分析*
+
+📰 **标题：** {title}
+
+⚠️ *此文章没有外部链接，可能是文本讨论*
+
+"""
+                if text:
+                    # Use text content directly for analysis
+                    analysis = self.hackernews_handler.analyze_article_with_ai(
+                        article, text, openai_client, default_model
+                    )
+                    if analysis:
+                        user_response += f"📝 **AI 分析结果：**\n\n{analysis}"
+                    else:
+                        user_response += "❌ AI 分析失败，请稍后重试"
+                else:
+                    user_response += "📝 **内容：** 无可用文本内容"
+
+                user_response += f"\n\n🤖 *由 HN AI 机器人自动分析*\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                return escape_markdown(user_response)
+
+            # Fetch article content
+            content = self.hackernews_handler.fetch_article_content(article_url)
+            if not content:
+                return f"""🤖 *Hacker News AI 文章分析*
+
+📰 **标题：** {article.get('title', 'No title')}
+
+🔗 **链接：** [阅读原文]({article_url})
+
+❌ **内容获取失败**
+
+无法获取文章内容进行分析，可能是：
+• 网站访问受限
+• 文章链接已失效
+• 网络连接问题
+
+🔗 您可以直接点击链接查看原文：
+{article_url}
+
+🤖 *Hacker News AI 机器人*
+                """
+
+            # Analyze article with AI
+            analysis = self.hackernews_handler.analyze_article_with_ai(
+                article, content, openai_client, default_model
+            )
+
+            if not analysis:
+                return f"""🤖 *Hacker News AI 文章分析*
+
+📰 **标题：** {article.get('title', 'No title')}
+
+🔗 **链接：** [阅读原文]({article_url})
+
+❌ **AI 分析失败**
+
+AI 分析服务暂时不可用，请稍后重试。
+
+🔗 直接查看原文：
+{article_url}
+
+🤖 *Hacker News AI 机器人*
+                """
+
+            # Format response for user
+            user_response = self.hackernews_handler.format_analysis_for_telegram(article, analysis)
+
+            # Handle channel forwarding if enabled
+            if (self.config.ENABLE_RSS_FORWARDING and
+                self.config.RSS_FORWARD_TO_CHANNEL and
+                self.bot):
+                try:
+                    channel_message = self.hackernews_handler.format_analysis_for_channel(
+                        article, analysis, self.config.RSS_FORWARD_TO_CHANNEL
+                    )
+
+                    logger.info(f"Forwarding Hacker News analysis to channel: @{self.config.RSS_FORWARD_TO_CHANNEL}")
+                    forward_result = self.bot.send_message_to_channel(
+                        self.config.RSS_FORWARD_TO_CHANNEL,
+                        channel_message
+                    )
+
+                    if forward_result:
+                        logger.info(f"Successfully forwarded Hacker News analysis to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
+                    else:
+                        logger.warning(f"Failed to forward Hacker News analysis to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
+
+                except Exception as e:
+                    logger.error(f"Error forwarding Hacker News analysis to channel: {e}")
+
+            return escape_markdown(user_response)
+
+        except Exception as e:
+            logger.error(f"Error in Hacker News command: {e}")
+            return "❌ 获取Hacker News文章时发生错误，请稍后重试。\n\n#error"
 
     def handle_command(self, command, full_message, user_id):
         """Handle incoming commands"""

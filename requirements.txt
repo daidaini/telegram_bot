@@ -4,3 +4,7 @@ python-dotenv==1.0.0
 feedparser==6.0.10
 python-dateutil==2.8.2
 openai>=1.0.0
+beautifulsoup4==4.13.4
+lxml==5.4.0
+html5lib==1.1
+PySocks>=1.7.1
