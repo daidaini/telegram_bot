@@ -16,9 +16,6 @@ class Config:
     # News API key (GNews)
     NEWS_API_KEY: str = os.getenv('GNEWS_API_KEY', '')
     NEWS_API_URL: str = 'https://gnews.io/api/v4/top-headlines'
-    
-    # Quote API settings
-    QUOTE_API_URL: str = 'https://api.quotable.io/random'
 
     # Default country/region for news (GNews uses country codes)
     DEFAULT_NEWS_COUNTRY: str = 'cn'

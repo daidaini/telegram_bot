@@ -153,12 +153,11 @@ def generate_inspirational_quote(openai_client: OpenAIClient, model: str) -> dic
     """Generate a random inspirational quote with detailed analysis"""
 
     # Step 1: Generate the quote
-    quote_prompt = """请生成一句富有哲理和启发性的励志名言。要求：
+    quote_prompt = """随机获取一句富有哲理和启发性的励志名人名言。要求：
 1. 内容积极向上，具有深度思考价值
-2. 语言简洁优美，易于记忆和传播
+2. 名言内容久经历史验证, 被广泛引用
 3. 涵盖人生、成功、成长、智慧等主题
-4. 避免过于常见或陈词滥调的内容
-5. 提供一个虚构但合理的作者姓名和背景
+4. 作者和内容必须是真实可查证地
 
 请按照以下JSON格式返回：
 {
@@ -168,7 +167,7 @@ def generate_inspirational_quote(openai_client: OpenAIClient, model: str) -> dic
 }"""
 
     messages = [
-        {"role": "system", "content": "你是一个专业的名言创作助手，擅长创作富有哲理和启发性的名言警句。"},
+        {"role": "system", "content": "你是一名博通古今的学者, 有丰富人生阅历, 善于指引困顿迷茫的年轻人。"},
         {"role": "user", "content": quote_prompt}
     ]
 
@@ -204,17 +203,31 @@ def generate_inspirational_quote(openai_client: OpenAIClient, model: str) -> dic
 作者：{quote_data['author']}
 作者背景：{quote_data['background']}
 
-请提供详细的分析，包括：
-1. **名言解读**：解释这句名言的深层含义和哲学思想
-2. **历史背景**：分析这句名言产生的历史时代背景和社会环境
-3. **现实意义**：探讨这句名言在当代社会的应用价值和指导意义
-4. **相关引用**：提供2-3个历史上或当代名人引用类似思想的例子
-5. **实践建议**：给出如何在生活中践行这句名言的具体建议
+字数限制在1000字以内，输出格式使用纯文本
+"""
+        system_prompt = """探寻[领域]的第一性原理。
 
-请保持分析的专业性和深度，语言优美流畅，字数控制在800-1200字之间。"""
+= 追求 = 
+找到那些“不能再简化，却能解释一切”的真理。
+
+= 何为公理级原则 =
+简单到无法反驳，深刻到令人沉思
+剥离现象看本质，穿透迷雾见真相
+既是起点也是终点，既是公理也是定律
+放之四海而皆准，历经时间而不朽
+
+= 何为金句 = 
+如果一句话让人：
+第一次听觉得“这不是显而易见吗？”
+仔细想觉得“等等，好像很深刻”
+最后发现“原来这就是一切的答案”
+那它就触及了本质。
+
+= 唯一提醒 = 
+宁可不说，不可不深。"""
 
         analysis_messages = [
-            {"role": "system", "content": "你是一位资深的思想学者和文学评论家，擅长对名言警句进行深度解读和分析。"},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": analysis_prompt}
         ]
 
@@ -228,43 +241,7 @@ def generate_inspirational_quote(openai_client: OpenAIClient, model: str) -> dic
         }
 
     except (json.JSONDecodeError, ValueError, KeyError) as e:
-        # Fallback with detailed analysis
-        fallback_quote = "成功不是终点，失败不是终结，唯有勇气才是永恒。"
-        fallback_author = "温斯顿·丘吉尔"
-        fallback_background = "英国首相，二战时期领导人物，以坚韧不拔的意志和卓越的领导才能著称。"
-
-        # Generate analysis for fallback quote
-        analysis_prompt = f"""请对以下名言进行深度分析：
-
-名言："{fallback_quote}"
-作者：{fallback_author}
-作者背景：{fallback_background}
-
-请提供详细的分析，包括：
-1. **名言解读**：解释这句名言的深层含义和哲学思想
-2. **历史背景**：分析这句名言产生的历史时代背景和社会环境
-3. **现实意义**：探讨这句名言在当代社会的应用价值和指导意义
-4. **相关引用**：提供2-3个历史上或当代名人引用类似思想的例子
-5. **实践建议**：给出如何在生活中践行这句名言的具体建议
-
-请保持分析的专业性和深度，语言优美流畅，字数控制在800-1200字之间。"""
-
-        analysis_messages = [
-            {"role": "system", "content": "你是一位资深的思想学者和文学评论家，擅长对名言警句进行深度解读和分析。"},
-            {"role": "user", "content": analysis_prompt}
-        ]
-
-        try:
-            analysis = openai_client.chat_completion(analysis_messages, model)
-        except:
-            analysis = "这句名言体现了丘吉尔对人生奋斗精神的深刻理解，强调了在面对挑战和困难时保持勇气和坚持不懈的重要性。"
-
-        return {
-            'quote': fallback_quote,
-            'author': fallback_author,
-            'background': fallback_background,
-            'analysis': analysis
-        }
+        raise Exception(f"Failed to parse quote data: {str(e)}")
     except Exception as e:
         raise Exception(f"Failed to generate quote: {str(e)}")
 
@@ -308,11 +285,6 @@ def format_quote_for_channel(quote_data: dict, channel_name: str = None) -> str:
 
 📖 精选解读：
 {analysis}
-
-✨ 每日思考：这句话如何在今天启发我们？
-
-🤖 AI智慧助手 • 深度生成
-🕐 {datetime.now().strftime('%Y-%m-%d %H:%M')}
 
 #智慧名言 #每日分享 #AI解读
 """

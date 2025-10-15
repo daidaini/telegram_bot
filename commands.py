@@ -290,7 +290,6 @@ class CommandHandler:
 
             # Format response for user
             formatted_response = format_quote_response(quote_data)
-            formatted_response += f"\n\n🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n📊 基于OpenAI模型：{default_model}"
 
             # Handle channel forwarding if enabled
             if (self.config.ENABLE_RSS_FORWARDING and
@@ -310,7 +309,6 @@ class CommandHandler:
 
                     if forward_result:
                         logger.info(f"Successfully forwarded quote to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
-                        formatted_response += f"\n\n✅ 智慧名言已分享到 @{self.config.RSS_FORWARD_TO_CHANNEL}"
                     else:
                         logger.warning(f"Failed to forward quote to channel @{self.config.RSS_FORWARD_TO_CHANNEL}")
 
@@ -324,42 +322,14 @@ class CommandHandler:
             return self._get_fallback_quote()
 
     def _get_fallback_quote(self):
-        """Fallback quote method when AI is not available"""
-        try:
-            # Try the original API first
-            response = requests.get(self.config.QUOTE_API_URL, timeout=10)
-            response.raise_for_status()
-
-            data = response.json()
-            quote_text = data.get('content', '')
-            author = data.get('author', 'Unknown')
-
-            if quote_text:
-                formatted_quote = f"""
-💭 今日名言：
-
-_"{quote_text}"_
-
-🖋️ — {author}
-
-🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-📊 来源：Quotable API
-                """.strip()
-                return escape_markdown(formatted_quote.strip()) + "\n\n#daily_quote"
-
-        except Exception as e:
-            logger.warning(f"Quote API also failed: {e}")
-
-        # Final fallback to static quote
         return """
 💭 今日名言：
 
 _"成就伟大事业的唯一方法是热爱你所做的工作。"_
 
 🖋️ — 史蒂夫·乔布斯
-
-🕐 备用名言 - API暂时不可用
         """.strip() + "\n\n#daily_quote"
+    
 
     def ask_question(self, command, full_message, user_id):
         """Ask AI assistant a question using content_generator"""
