@@ -416,31 +416,13 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
 
             # Get article URL
             article_url = article.get('url')
-            if not article_url:
-                # If no URL, it might be a text-only post
-                title = article.get('title', 'No title')
-                text = article.get('text', '')
+            content = article.get('text', '')
 
-                user_response = f"""🤖 *Hacker News 文章分析* \n\n📰 **标题：** {title}"""
-                if text:
-                    # Use text content directly for analysis
-                    analysis = self.hackernews_handler.analyze_article_with_ai(
-                        article, text, openai_client, default_model
-                    )
-                    if analysis:
-                        user_response += f"📝 **文章分析结果：**\n\n{analysis}"
-                    else:
-                        return ""
-                else:
-                    return ""
-
-                user_response += f"\n\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                return escape_markdown(user_response)
-
-            # Fetch article content
-            content = self.hackernews_handler.fetch_article_content(article_url)
-            if not content:
-                return ""
+            if article_url:
+                # Fetch article content
+                content = self.hackernews_handler.fetch_article_content(article_url)
+                if not content:
+                    logger.warning(f"Failed to fetch content for article: {article_url}")
 
             # Analyze article with AI
             analysis = self.hackernews_handler.analyze_article_with_ai(
@@ -450,8 +432,20 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
             if not analysis:
                 return ""
 
+            # Publish to Telegraph
+            telegraph_url = self.hackernews_handler.publish_to_telegraph(
+                title=article.get('title', 'No title'),
+                analysis=analysis,
+                article_url=article_url
+            )
+
             # Format response for user
             user_response = self.hackernews_handler.format_analysis_for_telegram(article, analysis)
+
+            # Add Telegraph link to response
+            if telegraph_url:
+                telegraph_line = f"\n\n📰 **📖 阅读完整分析**: [Telegraph]({telegraph_url})"
+                user_response += telegraph_line
 
             # Handle channel forwarding if enabled
             if (self.config.ENABLE_RSS_FORWARDING and
@@ -459,7 +453,7 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
                 self.bot):
                 try:
                     channel_message = self.hackernews_handler.format_analysis_for_channel(
-                        article, analysis, self.config.RSS_FORWARD_TO_CHANNEL
+                        article, analysis, self.config.RSS_FORWARD_TO_CHANNEL, telegraph_url
                     )
 
                     logger.info(f"Forwarding Hacker News analysis to channel: @{self.config.RSS_FORWARD_TO_CHANNEL}")

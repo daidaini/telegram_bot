@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 from urllib.parse import urlparse
 import time
 from content_fetcher import ContentFetcher
+from telegraph_client import TelegraphClient, create_telegraph_client
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ class HackerNewsHandler:
         ]
         # Initialize content fetcher
         self.content_fetcher = ContentFetcher()
+        # Initialize Telegraph client
+        self.telegraph_client = create_telegraph_client()
 
     def get_new_stories(self, limit: int = 500) -> List[int]:
         """Get latest story IDs from Hacker News"""
@@ -202,9 +205,6 @@ class HackerNewsHandler:
 
             user_message = f"""
 标题：{title}
-
-链接：{url}
-
 内容：
 {content}
 """
@@ -228,43 +228,77 @@ class HackerNewsHandler:
         score = article_data.get('score', 0)
         comments = article_data.get('descendants', 0)
 
-        message = f"""🤖 *Hacker News 文章分析*
+        message = f"""*Hacker News 文章分析*
 
 📰 **标题：** {title}
 
 🔗 **链接：** [阅读原文]({url})
 
-📊 **Hacker Stats：** {score} points | {comments} comments
-
-📝 **AI 分析结果：**
-
 {analysis}
-
----
-*🤖 由 HN AI 机器人自动分析*
-*📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}*"""
+"""
 
         return message
 
-    def format_analysis_for_channel(self, article_data: Dict, analysis: str, channel_name: str) -> str:
-        """Format the analysis for Telegram channel posting"""
-        title = article_data.get('title', 'No title')
-        url = article_data.get('url', '')
-        score = article_data.get('score', 0)
+    def publish_to_telegraph(self, title: str, analysis: str, article_url: str) -> Optional[str]:
+        """
+        Publish analysis to Telegraph
 
-        message = f"""🤖 @{channel_name} Hacker News AI 精选
+        Args:
+            title: Article title
+            analysis: AI analysis result (Markdown)
+            article_url: Original article URL
 
-🔥 **今日热文：** {title}
+        Returns:
+            Telegraph URL or None if failed
+        """
+        try:
+            # Ensure Telegraph client has access token
+            if not self.telegraph_client.access_token:
+                logger.info("Creating Telegraph account...")
+                account = self.telegraph_client.create_account(
+                    short_name="HN_AI_Bot",
+                    author_name="Hacker News Bot"
+                )
+                if not account:
+                    logger.error("Failed to create Telegraph account")
+                    return None
 
-📊 Hacker News: {score} points
-
-📝 **深度分析：**
+            # Create content for Telegraph page
+            telegraph_content = f"""
 
 {analysis}
 
-🔗 [阅读原文]({url})
-
 ---
-*🤖 AI 自动分析 | {datetime.now().strftime('%Y-%m-%d %H:%M')}*"""
+
+**Original Article**: {article_url}
+"""
+
+            # Create Telegraph page
+            page_info = self.telegraph_client.create_telegraph_page_from_markdown(
+                title=f"{title}",
+                markdown_content=telegraph_content,
+                author_name="Hacker News Bot"
+            )
+
+            if page_info:
+                telegraph_url = page_info.get('url')
+                logger.info(f"✅ Successfully published to Telegraph: {telegraph_url}")
+                return telegraph_url
+            else:
+                logger.error("Failed to create Telegraph page")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error publishing to Telegraph: {e}")
+            return None
+
+    def format_analysis_for_channel(self, article_data: Dict, analysis: str, channel_name: str, telegraph_url: str = None) -> str:
+        """Format the analysis for Telegram channel posting"""
+        if telegraph_url:
+            # Only send Telegraph link
+            message = telegraph_url
+        else:
+            # Fallback if Telegraph URL is not available
+            message = ""
 
         return message
