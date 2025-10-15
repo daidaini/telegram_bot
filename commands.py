@@ -392,6 +392,7 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
             logger.error(f"Error in ask command: {e}")
             return f"❌ 处理问题时发生错误：{str(e)}\n\n请稍后重试或检查API配置。\n\n#error"
 
+
     def get_hacker_news(self, command, full_message, user_id):
         """Get latest AI-related article from Hacker News with AI analysis"""
         try:
@@ -411,23 +412,7 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
             # Find AI-related article from today
             article = self.hackernews_handler.find_ai_article_today()
             if not article:
-                return """
-🔍 *Hacker News AI 搜索*
-
-📅 当天未找到AI相关文章
-
-今天 Hacker News 上可能没有发布新的AI主题文章，或者相关文章已被错过。
-
-🔍 **搜索范围：**
-• 当天发布的最新文章
-• 包含 AI、机器学习、深度学习等关键词
-• 技术文章和讨论
-
-⏰ **下次检查：** 几分钟后重试
-💡 **建议：** 可以稍后再次尝试此命令
-
-🤖 *Hacker News AI 机器人*
-                """.strip()
+                return ""
 
             # Get article URL
             article_url = article.get('url')
@@ -436,49 +421,26 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
                 title = article.get('title', 'No title')
                 text = article.get('text', '')
 
-                user_response = f"""🤖 *Hacker News AI 文章分析*
-
-📰 **标题：** {title}
-
-⚠️ *此文章没有外部链接，可能是文本讨论*
-
-"""
+                user_response = f"""🤖 *Hacker News 文章分析* \n\n📰 **标题：** {title}"""
                 if text:
                     # Use text content directly for analysis
                     analysis = self.hackernews_handler.analyze_article_with_ai(
                         article, text, openai_client, default_model
                     )
                     if analysis:
-                        user_response += f"📝 **AI 分析结果：**\n\n{analysis}"
+                        user_response += f"📝 **文章分析结果：**\n\n{analysis}"
                     else:
-                        user_response += "❌ AI 分析失败，请稍后重试"
+                        return ""
                 else:
-                    user_response += "📝 **内容：** 无可用文本内容"
+                    return ""
 
-                user_response += f"\n\n🤖 *由 HN AI 机器人自动分析*\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                user_response += f"\n\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"
                 return escape_markdown(user_response)
 
             # Fetch article content
             content = self.hackernews_handler.fetch_article_content(article_url)
             if not content:
-                return f"""🤖 *Hacker News AI 文章分析*
-
-📰 **标题：** {article.get('title', 'No title')}
-
-🔗 **链接：** [阅读原文]({article_url})
-
-❌ **内容获取失败**
-
-无法获取文章内容进行分析，可能是：
-• 网站访问受限
-• 文章链接已失效
-• 网络连接问题
-
-🔗 您可以直接点击链接查看原文：
-{article_url}
-
-🤖 *Hacker News AI 机器人*
-                """
+                return ""
 
             # Analyze article with AI
             analysis = self.hackernews_handler.analyze_article_with_ai(
@@ -486,21 +448,7 @@ _"成就伟大事业的唯一方法是热爱你所做的工作。"_
             )
 
             if not analysis:
-                return f"""🤖 *Hacker News AI 文章分析*
-
-📰 **标题：** {article.get('title', 'No title')}
-
-🔗 **链接：** [阅读原文]({article_url})
-
-❌ **AI 分析失败**
-
-AI 分析服务暂时不可用，请稍后重试。
-
-🔗 直接查看原文：
-{article_url}
-
-🤖 *Hacker News AI 机器人*
-                """
+                return ""
 
             # Format response for user
             user_response = self.hackernews_handler.format_analysis_for_telegram(article, analysis)
@@ -532,7 +480,7 @@ AI 分析服务暂时不可用，请稍后重试。
 
         except Exception as e:
             logger.error(f"Error in Hacker News command: {e}")
-            return "❌ 获取Hacker News文章时发生错误，请稍后重试。\n\n#error"
+            return ""
 
     def handle_command(self, command, full_message, user_id):
         """Handle incoming commands"""

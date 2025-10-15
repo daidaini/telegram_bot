@@ -47,6 +47,10 @@ class TelegramBot:
         }
 
         try:
+            if not text:
+                logger.warning("No message to send.")
+                return None
+            
             response = requests.post(url, data=data, timeout=10)
             response.raise_for_status()
             logger.info(f"Message sent to chat {chat_id}")
