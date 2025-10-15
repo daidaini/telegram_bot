@@ -115,7 +115,6 @@ curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook"
 
 ### Optional API Keys
 - `GNEWS_API_KEY` - GNews API key for news headlines
-- `WEATHER_API_KEY` - OpenWeatherMap API key (currently unused)
 - `OPENAI_API_KEY` - OpenAI API key for AI content generation
 - `OPENAI_BASE_URL` - Custom API base URL for OpenAI-compatible APIs
 - `DEFAULT_MODEL` - Default model to use (e.g., gpt-3.5-turbo, gpt-4, deepseek-chat)

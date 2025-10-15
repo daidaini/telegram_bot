@@ -13,10 +13,6 @@ class Config:
     # Bot Token from environment variable or .env file
     BOT_TOKEN: str = os.getenv('TELEGRAM_BOT_TOKEN', '')
     
-    # Weather API key (OpenWeatherMap)
-    WEATHER_API_KEY: str = os.getenv('WEATHER_API_KEY', '')
-    WEATHER_API_URL: str = 'http://api.openweathermap.org/data/2.5/weather'
-    
     # News API key (GNews)
     NEWS_API_KEY: str = os.getenv('GNEWS_API_KEY', '')
     NEWS_API_URL: str = 'https://gnews.io/api/v4/top-headlines'

@@ -94,7 +94,6 @@ class CommandHandler:
 • 使用国家代码查询新闻 (cn, us, uk 等) 或主题关键词
 • 所有命令不区分大小写
 • RSS新闻和GNews都包含摘要和原文链接
-• AI问答需要配置OpenAI API密钥
 • RSS新闻和智慧名言可自动转发到配置的频道
         """
         return escape_markdown(help_text.strip())
