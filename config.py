@@ -19,9 +19,6 @@ class Config:
     
     # Quote API settings
     QUOTE_API_URL: str = 'https://api.quotable.io/random'
-    
-    # Default city for weather (legacy)
-    DEFAULT_CITY: str = 'Beijing'
 
     # Default country/region for news (GNews uses country codes)
     DEFAULT_NEWS_COUNTRY: str = 'cn'
